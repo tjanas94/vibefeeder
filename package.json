@@ -1,0 +1,44 @@
+{
+  "name": "vibefeeder",
+  "type": "module",
+  "author": "Tomasz Janas <tomek@janas.dev>",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tjanas94/vibefeeder"
+  },
+  "bugs": {
+    "url": "https://github.com/tjanas94/vibefeeder/issues"
+  },
+  "homepage": "https://github.com/tjanas94/vibefeeder#readme",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "alpinejs": "3.15.0",
+    "daisyui": "5.1.29",
+    "htmx.org": "2.0.7"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "20.1.0",
+    "@commitlint/config-conventional": "20.0.0",
+    "@tailwindcss/cli": "4.1.14",
+    "husky": "9.1.7",
+    "lint-staged": "16.2.3",
+    "prettier": "3.6.2",
+    "tailwindcss": "4.1.14"
+  },
+  "lint-staged": {
+    "*.go": [
+      "goimports -w",
+      "golangci-lint run --fix"
+    ],
+    "*.templ": [
+      "templ fmt"
+    ],
+    "*.{js,json,css,yml,yaml,md}": [
+      "prettier --write"
+    ]
+  }
+}

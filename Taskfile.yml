@@ -1,0 +1,125 @@
+version: "3"
+
+tasks:
+  dev:
+    desc: Run development environment
+    deps:
+      - build:js
+      - watch:css
+      - watch:templ
+      - watch:go
+
+  build:
+    desc: Build for production
+    deps:
+      - build:js
+      - build:css
+      - build:templ
+    cmd: go build -o ./dist/vibefeeder ./cmd/vibefeeder
+    sources:
+      - cmd/**/*.go
+      - internal/**/*.go
+      - go.mod
+      - go.sum
+    generates:
+      - ./dist/vibefeeder
+
+  rebuild:
+    desc: Clean and build for production
+    deps:
+      - clean
+    cmds:
+      - task: build
+
+  install-deps:
+    desc: Install dependencies
+    cmds:
+      - npm install
+      - go mod tidy
+
+  run:
+    desc: Run the built binary
+    deps:
+      - build
+    cmd: ./dist/vibefeeder
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf dist/ tmp/
+      - find . -name "*_templ.go" -type f -delete
+
+  build:js:
+    desc: Build JavaScript dependencies
+    cmds:
+      - mkdir -p dist/static/js
+      - cp node_modules/htmx.org/dist/htmx.min.js dist/static/js/htmx.min.js
+      - cp node_modules/alpinejs/dist/cdn.min.js dist/static/js/alpine.min.js
+    sources:
+      - node_modules/htmx.org/dist/htmx.min.js
+      - node_modules/alpinejs/dist/cdn.min.js
+    generates:
+      - dist/static/js/htmx.min.js
+      - dist/static/js/alpine.min.js
+
+  build:css:
+    desc: Build CSS with Tailwind
+    cmd: tailwindcss -i web/styles/main.css -o dist/static/css/main.css --minify
+    sources:
+      - web/styles/**/*.css
+      - internal/**/*.templ
+    generates:
+      - dist/static/css/main.css
+
+  build:templ:
+    desc: Generate Go code from templ files
+    cmd: templ generate
+    sources:
+      - internal/**/*.templ
+    generates:
+      - internal/**/*_templ.go
+
+  watch:css:
+    desc: Watch and build CSS with Tailwind
+    cmd: tailwindcss -i web/styles/main.css -o dist/static/css/main.css --watch
+
+  watch:templ:
+    desc: Watch and build templ files
+    cmd: templ generate --watch
+
+  watch:go:
+    desc: Watch and build Go with Air
+    cmd: air
+
+  lint:
+    desc: Run all linters
+    deps:
+      - lint:go
+      - lint:prettier
+
+  lint:go:
+    desc: Run Go linters
+    cmd: golangci-lint run
+
+  lint:prettier:
+    desc: Check formatting with Prettier
+    cmd: node_modules/.bin/prettier --check .
+
+  fmt:
+    desc: Format all code
+    deps:
+      - fmt:go
+      - fmt:templ
+      - fmt:prettier
+
+  fmt:go:
+    desc: Format Go code
+    cmd: goimports -w .
+
+  fmt:templ:
+    desc: Format Templ files
+    cmd: templ fmt .
+
+  fmt:prettier:
+    desc: Format with Prettier
+    cmd: node_modules/.bin/prettier --write .

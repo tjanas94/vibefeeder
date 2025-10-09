@@ -1,0 +1,9 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "./dist/vibefeeder"
+  cmd = "go build -o ./dist/vibefeeder ./cmd/vibefeeder"
+  exclude_dir = ["tmp", "node_modules", "dist"]
+  exclude_regex = ["_test.go"]
+  include_ext = ["go"]

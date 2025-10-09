@@ -1,0 +1,10 @@
+# Build artifacts
+dist
+tmp
+
+# Minified files
+*.min.js
+*.min.css
+
+# Lock files
+package-lock.json

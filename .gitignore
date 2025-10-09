@@ -1,0 +1,23 @@
+# Build output
+dist/
+tmp/
+*_templ.go
+.task/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
