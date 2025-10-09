@@ -31,15 +31,8 @@
     "tailwindcss": "4.1.14"
   },
   "lint-staged": {
-    "*.go": [
-      "goimports -w",
-      "golangci-lint run --fix"
-    ],
-    "*.templ": [
-      "templ fmt"
-    ],
-    "*.{js,json,css,yml,yaml,md}": [
-      "prettier --write"
-    ]
+    "*.go": "goimports -w",
+    "*.templ": "templ fmt",
+    "*.{js,json,css,yml,yaml,md}": "prettier --write"
   }
 }

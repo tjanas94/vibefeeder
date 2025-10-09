@@ -16,7 +16,7 @@ When introducing changes to the project, always follow the directory structure b
 
 - `cmd/` - Contains the main application entry point and any subcommands
 - `internal/app` - Contains application setup, routing, and middleware
-- `internal/shared/database` - Contains database client
+- `internal/shared/database` - Contains database client with supabase types
 - `internal/shared/config` - Contains configuration loading and management logic
 - `internal/shared/http` - Contains http server utils
 - `internal/shared/view` - Contains shared layout, components and pages

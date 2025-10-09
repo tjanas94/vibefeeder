@@ -1,47 +1,45 @@
 package main
 
 import (
+	"context"
+	"log"
 	"os"
-	"path/filepath"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-	"github.com/tjanas94/vibefeeder/internal/view"
+	"github.com/tjanas94/vibefeeder/internal/app"
 )
 
 func main() {
-	// Get executable directory
-	exe, err := os.Executable()
+	// Initialize application
+	application, err := app.New()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to initialize application: %v", err)
 	}
-	exeDir := filepath.Dir(exe)
-	staticDir := filepath.Join(exeDir, "static")
 
-	e := echo.New()
-
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(middleware.BodyLimit("2M"))
-	e.Use(middleware.SecureWithConfig(middleware.SecureConfig{
-		XSSProtection:         "1; mode=block",
-		ContentTypeNosniff:    "nosniff",
-		XFrameOptions:         "DENY",
-		ContentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'",
-		ReferrerPolicy:        "strict-origin-when-cross-origin",
-	}))
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			c.Response().Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-			return next(c)
+	// Start server in a goroutine
+	go func() {
+		if err := application.Start(":8080"); err != nil {
+			log.Printf("Server error: %v", err)
 		}
-	})
+	}()
 
-	e.Static("/static", staticDir)
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
 
-	e.GET("/", func(c echo.Context) error {
-		return view.Hello("World").Render(c.Request().Context(), c.Response().Writer)
-	})
+	log.Println("Received shutdown signal")
 
-	e.Logger.Fatal(e.Start(":8080"))
+	// Create shutdown context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Gracefully shutdown the application
+	if err := application.Shutdown(ctx); err != nil {
+		log.Fatalf("Failed to shutdown gracefully: %v", err)
+	}
+
+	log.Println("Server exited")
 }

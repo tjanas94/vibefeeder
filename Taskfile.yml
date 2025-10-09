@@ -15,10 +15,11 @@ tasks:
       - build:js
       - build:css
       - build:templ
-    cmd: go build -o ./dist/vibefeeder ./cmd/vibefeeder
+    cmd: go build -tags prod -o ./dist/vibefeeder ./cmd/vibefeeder
     sources:
       - cmd/**/*.go
       - internal/**/*.go
+      - dist/static/**/*
       - go.mod
       - go.sum
     generates:
