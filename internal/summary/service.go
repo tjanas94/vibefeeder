@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/supabase-community/postgrest-go"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 )
@@ -170,4 +171,49 @@ func (s *Service) recordSummaryEvent(ctx context.Context, userID string) error {
 		ExecuteTo(&result)
 
 	return err
+}
+
+// GetLatestSummaryForUser retrieves the latest summary for a user and determines if they can generate new ones
+func (s *Service) GetLatestSummaryForUser(ctx context.Context, userID string) (*models.SummaryDisplayViewModel, error) {
+	// Step 1: Fetch the latest summary for the user
+	var summaries []database.PublicSummariesSelect
+	_, err := s.db.From("summaries").
+		Select("*", "", false).
+		Eq("user_id", userID).
+		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
+		Limit(1, "").
+		ExecuteTo(&summaries)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch latest summary: %w", err)
+	}
+
+	// Step 2: Check if user has at least one working feed (last_fetch_status = 'success')
+	var feeds []database.PublicFeedsSelect
+	_, err = s.db.From("feeds").
+		Select("id", "", false).
+		Eq("user_id", userID).
+		Eq("last_fetch_status", "success").
+		Limit(1, "").
+		ExecuteTo(&feeds)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to check working feeds: %w", err)
+	}
+
+	canGenerate := len(feeds) > 0
+
+	// Step 3: Build the view model
+	vm := &models.SummaryDisplayViewModel{
+		ShowEmptyState: len(summaries) == 0,
+		CanGenerate:    canGenerate,
+	}
+
+	// If summary exists, convert it to view model
+	if len(summaries) > 0 {
+		summaryVM := models.NewSummaryFromDB(summaries[0])
+		vm.Summary = &summaryVM
+	}
+
+	return vm, nil
 }

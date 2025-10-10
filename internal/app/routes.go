@@ -34,7 +34,10 @@ func (a *App) setupRoutes() {
 	// Note: MockAuthMiddleware is already applied globally in setupMiddleware
 	// TODO: Replace with real user ID from JWT when auth is implemented
 
-	// Apply rate limiting to summary endpoint (per user based on context)
+	// Summary endpoints
+	a.Echo.GET("/summaries/latest", summaryHandler.GetLatestSummary)
+
+	// Apply rate limiting to summary generation endpoint (per user based on context)
 	a.Echo.POST("/summaries", summaryHandler.GenerateSummary, middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 		Store: rateLimiterStore,
 		IdentifierExtractor: func(c echo.Context) (string, error) {

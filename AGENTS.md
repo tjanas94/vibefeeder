@@ -50,6 +50,7 @@ Use `task --list` to see available tasks. Common tasks:
 - Use guard clauses to handle preconditions and invalid states early.
 - Implement proper error logging and user-friendly error messages.
 - Consider using custom error types or error factories for consistent error handling.
+- Separate pure functions from side-effecting functions.
 
 ### Guidelines for VERSION_CONTROL
 

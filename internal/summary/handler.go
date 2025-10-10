@@ -99,3 +99,24 @@ func parseTimestamp(timestamp string) time.Time {
 	}
 	return t
 }
+
+// GetLatestSummary handles GET /summaries/latest endpoint
+// Retrieves and displays the latest summary for the authenticated user
+func (h *Handler) GetLatestSummary(c echo.Context) error {
+	// Get user ID from authenticated session
+	userID := auth.GetUserID(c)
+	if userID == "" {
+		h.logger.Error("missing user_id in context")
+		return h.renderError(c, http.StatusUnauthorized, "Authentication required")
+	}
+
+	// Call service to get latest summary and view model
+	vm, err := h.service.GetLatestSummaryForUser(c.Request().Context(), userID)
+	if err != nil {
+		h.logger.Error("failed to get latest summary", "user_id", userID, "error", err)
+		return h.renderError(c, http.StatusInternalServerError, "Failed to load summary")
+	}
+
+	// Success - render display view with view model
+	return c.Render(http.StatusOK, "", view.Display(*vm))
+}
