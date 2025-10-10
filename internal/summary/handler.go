@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
@@ -36,26 +35,16 @@ func (h *Handler) GenerateSummary(c echo.Context) error {
 		return h.renderError(c, http.StatusUnauthorized, "Authentication required")
 	}
 
-	// Call service to generate summary
-	summary, err := h.service.GenerateSummary(c.Request().Context(), userID)
+	// Call service to generate summary and get view model
+	vm, err := h.service.GenerateSummary(c.Request().Context(), userID)
 
 	// Handle errors with appropriate HTTP status codes
 	if err != nil {
 		return h.handleServiceError(c, err)
 	}
 
-	// Success - render display view with summary data
-	vm := models.SummaryDisplayViewModel{
-		Summary: &models.SummaryViewModel{
-			ID:        summary.Id,
-			Content:   summary.Content,
-			CreatedAt: parseTimestamp(summary.CreatedAt),
-		},
-		ShowEmptyState: false,
-		CanGenerate:    true,
-	}
-
-	return c.Render(http.StatusOK, "", view.Display(vm))
+	// Success - render display view with view model
+	return c.Render(http.StatusOK, "", view.Display(*vm))
 }
 
 // handleServiceError maps service errors to appropriate HTTP responses
@@ -89,15 +78,6 @@ func (h *Handler) renderError(c echo.Context, statusCode int, message string) er
 		ErrorMessage: message,
 	}
 	return c.Render(statusCode, "", view.Error(vm))
-}
-
-// parseTimestamp parses an RFC3339 timestamp string to time.Time
-func parseTimestamp(timestamp string) time.Time {
-	t, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		return time.Time{}
-	}
-	return t
 }
 
 // GetLatestSummary handles GET /summaries/latest endpoint

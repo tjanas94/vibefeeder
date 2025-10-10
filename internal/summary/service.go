@@ -3,6 +3,7 @@ package summary
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
@@ -19,21 +20,24 @@ type AIClient interface {
 type Service struct {
 	db       *database.Client
 	aiClient AIClient
+	logger   *slog.Logger
 }
 
 // NewService creates a new summary service
-func NewService(db *database.Client, aiClient AIClient) *Service {
+func NewService(db *database.Client, aiClient AIClient, logger *slog.Logger) *Service {
 	return &Service{
 		db:       db,
 		aiClient: aiClient,
+		logger:   logger,
 	}
 }
 
 // GenerateSummary generates a new AI summary from user's articles from the last 24 hours
-func (s *Service) GenerateSummary(ctx context.Context, userID string) (*database.PublicSummariesSelect, error) {
+func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.SummaryDisplayViewModel, error) {
 	// Step 1: Check if user has any feeds
 	hasFeeds, err := s.checkUserHasFeeds(ctx, userID)
 	if err != nil {
+		s.logger.Error("failed to check user feeds", "user_id", userID, "error", err)
 		return nil, fmt.Errorf("failed to check user feeds: %w", err)
 	}
 	if !hasFeeds {
@@ -43,6 +47,7 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*database
 	// Step 2: Fetch articles from last 24 hours
 	articles, err := s.fetchRecentArticles(ctx, userID)
 	if err != nil {
+		s.logger.Error("failed to fetch articles", "user_id", userID, "error", err)
 		return nil, fmt.Errorf("failed to fetch articles: %w", err)
 	}
 	if len(articles) == 0 {
@@ -58,23 +63,30 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*database
 
 	summaryContent, err := s.aiClient.GenerateSummary(aiCtx, prompt)
 	if err != nil {
+		s.logger.Error("AI service failed to generate summary", "user_id", userID, "error", err)
 		return nil, ErrAIServiceUnavailable
 	}
 
 	// Step 5: Save summary to database
-	summary, err := s.saveSummary(ctx, userID, summaryContent)
+	dbSummary, err := s.saveSummary(ctx, userID, summaryContent)
 	if err != nil {
+		s.logger.Error("failed to save summary to database", "user_id", userID, "error", err)
 		return nil, ErrDatabase
 	}
 
 	// Step 6: Record event
 	if err := s.recordSummaryEvent(ctx, userID); err != nil {
 		// Log error but don't fail the request
-		// In production, you would use slog here
-		fmt.Printf("failed to record summary event: %v\n", err)
+		s.logger.Warn("failed to record summary event", "user_id", userID, "error", err)
 	}
 
-	return summary, nil
+	// Convert database type to view model
+	summaryVM := models.NewSummaryFromDB(*dbSummary)
+	return &models.SummaryDisplayViewModel{
+		Summary:        &summaryVM,
+		ShowEmptyState: false,
+		CanGenerate:    true, // User just generated, so they have feeds
+	}, nil
 }
 
 // checkUserHasFeeds verifies if the user has at least one feed configured

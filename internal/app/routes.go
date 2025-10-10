@@ -23,7 +23,7 @@ func (a *App) setupRoutes() {
 
 	// Summary routes (authenticated with rate limiting)
 	aiClient := ai.NewOpenRouterClient(a.Config.OpenRouter.APIKey)
-	summaryService := summary.NewService(a.DB, aiClient)
+	summaryService := summary.NewService(a.DB, aiClient, a.Logger)
 	summaryHandler := summary.NewHandler(summaryService, a.Logger)
 
 	// Configure rate limiter: 1 request per 5 minutes per user
