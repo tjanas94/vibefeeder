@@ -21,6 +21,10 @@ Stores RSS feed sources added by users.
 
 - `UNIQUE(user_id, url)` - Prevents duplicate feeds for the same user
 
+**Triggers:**
+
+- `updated_at` is automatically updated via trigger on UPDATE operations
+
 ---
 
 ### 1.2 articles
