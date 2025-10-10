@@ -14,13 +14,15 @@
 
 When introducing changes to the project, always follow the directory structure below:
 
-- `cmd/` - Contains the main application entry point and any subcommands
-- `internal/app` - Contains application setup, routing, and middleware
-- `internal/shared/database` - Contains database client with supabase types
-- `internal/shared/config` - Contains configuration loading and management logic
-- `internal/shared/http` - Contains http server utils
-- `internal/shared/view` - Contains shared layout, components and pages
-- `internal/{feature}` - Contains feature-specific code, such as handlers, services, models and views for each domain area (e.g., `feed`, `user`, `summary`)
+- `cmd/vibefeeder/` - Application entry point (main.go with bootstrap and graceful shutdown)
+- `internal/app/` - Application setup, routing, and middleware configuration
+- `internal/shared/` - Shared utilities and infrastructure
+  - `config/` - Configuration loading and validation (env vars, .env support)
+  - `database/` - Database client with Supabase types and queries
+  - `logger/` - slog-based structured logging with Echo middleware integration
+  - `view/` - Templ renderer (echo.Renderer implementation) and shared components
+- `internal/{feature}/` - Feature-specific code organized by domain (e.g., `home`, `feed`, `user`, `summary`)
+  - Each feature contains: handlers, services, models, and feature-specific views
 
 When modifying the directory structure, always update this section.
 

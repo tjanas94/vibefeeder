@@ -9,7 +9,20 @@ import (
 
 // Config holds all application configuration
 type Config struct {
+	Server   ServerConfig
 	Supabase SupabaseConfig
+	Log      LogConfig
+}
+
+// ServerConfig contains server configuration
+type ServerConfig struct {
+	Address string
+}
+
+// LogConfig contains logging configuration
+type LogConfig struct {
+	Level  string // debug, info, warn, error
+	Format string // json, text
 }
 
 // SupabaseConfig contains Supabase-related configuration
@@ -25,9 +38,16 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
+		Server: ServerConfig{
+			Address: getEnvOrDefault("SERVER_ADDRESS", "localhost:8080"),
+		},
 		Supabase: SupabaseConfig{
 			URL: os.Getenv("SUPABASE_URL"),
 			Key: os.Getenv("SUPABASE_KEY"),
+		},
+		Log: LogConfig{
+			Level:  getEnvOrDefault("LOG_LEVEL", "info"),
+			Format: getEnvOrDefault("LOG_FORMAT", "json"),
 		},
 	}
 
@@ -36,6 +56,14 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// getEnvOrDefault returns environment variable value or default
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 // validate checks if all required configuration values are set

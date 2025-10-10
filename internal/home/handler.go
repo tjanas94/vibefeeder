@@ -1,24 +1,26 @@
 package home
 
 import (
-	"fmt"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/home/view"
+	"github.com/tjanas94/vibefeeder/internal/shared/database"
 )
 
 // Handler handles home page requests
-type Handler struct{}
+type Handler struct {
+	db *database.Client
+}
 
 // NewHandler creates a new home handler
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(db *database.Client) *Handler {
+	return &Handler{
+		db: db,
+	}
 }
 
 // Index handles the home page request
 func (h *Handler) Index(c echo.Context) error {
-	if err := view.Index().Render(c.Request().Context(), c.Response().Writer); err != nil {
-		return fmt.Errorf("failed to render home page: %w", err)
-	}
-	return nil
+	return c.Render(http.StatusOK, "", view.Index())
 }

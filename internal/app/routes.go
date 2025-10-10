@@ -13,7 +13,7 @@ func (a *App) setupRoutes() {
 	a.Echo.GET("/healthz", a.healthCheck)
 
 	// Home routes
-	homeHandler := home.NewHandler()
+	homeHandler := home.NewHandler(a.DB)
 	a.Echo.GET("/", homeHandler.Index)
 }
 

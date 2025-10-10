@@ -3,18 +3,15 @@ package app
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	"github.com/tjanas94/vibefeeder/internal/shared/logger"
 )
 
 // setupMiddleware configures all application middleware
 func (a *App) setupMiddleware() {
 	// Core middleware
-	a.Echo.Use(middleware.Logger())
+	a.Echo.Use(logger.RequestLoggerConfig(a.Logger))
 	a.Echo.Use(middleware.Recover())
 	a.Echo.Use(middleware.BodyLimit("2M"))
-
-	// Database middleware - inject database client into context
-	a.Echo.Use(database.Middleware(a.DB))
 
 	// Security middleware
 	a.Echo.Use(middleware.SecureWithConfig(middleware.SecureConfig{

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,13 +15,16 @@ func main() {
 	// Initialize application
 	application, err := app.New()
 	if err != nil {
-		log.Fatalf("Failed to initialize application: %v", err)
+		slog.Error("Failed to initialize application", "error", err)
+		os.Exit(1)
 	}
+
+	logger := application.Logger
 
 	// Start server in a goroutine
 	go func() {
-		if err := application.Start(":8080"); err != nil {
-			log.Printf("Server error: %v", err)
+		if err := application.Start(); err != nil {
+			logger.Info("Server stopped", "error", err)
 		}
 	}()
 
@@ -30,7 +33,7 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Received shutdown signal")
+	logger.Info("Received shutdown signal")
 
 	// Create shutdown context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -38,8 +41,9 @@ func main() {
 
 	// Gracefully shutdown the application
 	if err := application.Shutdown(ctx); err != nil {
-		log.Fatalf("Failed to shutdown gracefully: %v", err)
+		logger.Error("Failed to shutdown gracefully", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Server exited")
+	logger.Info("Server exited")
 }

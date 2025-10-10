@@ -65,7 +65,7 @@ tasks:
 
   build:css:
     desc: Build CSS with Tailwind
-    cmd: tailwindcss -i web/styles/main.css -o dist/static/css/main.css --minify
+    cmd: node_modules/.bin/tailwindcss -i web/styles/main.css -o dist/static/css/main.css --minify
     sources:
       - web/styles/**/*.css
       - internal/**/*.templ
@@ -82,7 +82,7 @@ tasks:
 
   watch:css:
     desc: Watch and build CSS with Tailwind
-    cmd: tailwindcss -i web/styles/main.css -o dist/static/css/main.css --watch
+    cmd: node_modules/.bin/tailwindcss -i web/styles/main.css -o dist/static/css/main.css --watch
 
   watch:templ:
     desc: Watch and build templ files

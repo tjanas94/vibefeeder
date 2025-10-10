@@ -61,7 +61,13 @@ Make sure you have the following tools installed:
     ```
 
 3.  **Set up environment variables:**
-    Create a `.env` file in the root of the project and add the necessary environment variables for database connections and API keys.
+    Copy `.env.example` to create your local configuration:
+
+    ```sh
+    cp .env.example .env
+    ```
+
+    Edit `.env` to configure your Supabase credentials and other settings.
 
 4.  **Run the development server:**
     This command starts the development server with hot-reloading for Go, Templ, and CSS changes.
