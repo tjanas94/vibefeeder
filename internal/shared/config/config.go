@@ -9,9 +9,10 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Server   ServerConfig
-	Supabase SupabaseConfig
-	Log      LogConfig
+	Server     ServerConfig
+	Supabase   SupabaseConfig
+	Log        LogConfig
+	OpenRouter OpenRouterConfig
 }
 
 // ServerConfig contains server configuration
@@ -31,6 +32,11 @@ type SupabaseConfig struct {
 	Key string
 }
 
+// OpenRouterConfig contains OpenRouter AI service configuration
+type OpenRouterConfig struct {
+	APIKey string
+}
+
 // Load reads configuration from environment variables
 // It automatically loads .env file if present
 func Load() (*Config, error) {
@@ -48,6 +54,9 @@ func Load() (*Config, error) {
 		Log: LogConfig{
 			Level:  getEnvOrDefault("LOG_LEVEL", "info"),
 			Format: getEnvOrDefault("LOG_FORMAT", "json"),
+		},
+		OpenRouter: OpenRouterConfig{
+			APIKey: getEnvOrDefault("OPENROUTER_API_KEY", "mock-api-key"),
 		},
 	}
 

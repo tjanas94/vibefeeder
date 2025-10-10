@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/tjanas94/vibefeeder/internal/shared/auth"
 	"github.com/tjanas94/vibefeeder/internal/shared/logger"
 )
 
@@ -12,6 +13,10 @@ func (a *App) setupMiddleware() {
 	a.Echo.Use(logger.RequestLoggerConfig(a.Logger))
 	a.Echo.Use(middleware.Recover())
 	a.Echo.Use(middleware.BodyLimit("2M"))
+
+	// Development middleware (mock auth)
+	// TODO: Replace with real authentication when auth is implemented
+	a.Echo.Use(auth.MockAuthMiddleware("4f7ed431-4b99-478e-b060-a5a36a46e85d"))
 
 	// Security middleware
 	a.Echo.Use(middleware.SecureWithConfig(middleware.SecureConfig{

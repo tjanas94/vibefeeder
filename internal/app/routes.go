@@ -4,7 +4,12 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/tjanas94/vibefeeder/internal/home"
+	"github.com/tjanas94/vibefeeder/internal/shared/ai"
+	"github.com/tjanas94/vibefeeder/internal/shared/auth"
+	"github.com/tjanas94/vibefeeder/internal/summary"
+	"golang.org/x/time/rate"
 )
 
 // setupRoutes configures all application routes
@@ -15,6 +20,29 @@ func (a *App) setupRoutes() {
 	// Home routes
 	homeHandler := home.NewHandler(a.DB)
 	a.Echo.GET("/", homeHandler.Index)
+
+	// Summary routes (authenticated with rate limiting)
+	aiClient := ai.NewOpenRouterClient(a.Config.OpenRouter.APIKey)
+	summaryService := summary.NewService(a.DB, aiClient)
+	summaryHandler := summary.NewHandler(summaryService, a.Logger)
+
+	// Configure rate limiter: 1 request per 5 minutes per user
+	// rate.Every(5 * time.Minute) = 1 request every 5 minutes
+	rateLimiterStore := middleware.NewRateLimiterMemoryStore(rate.Every(5 * 60)) // 1 request per 300 seconds
+
+	// Create authenticated route group
+	// Note: MockAuthMiddleware is already applied globally in setupMiddleware
+	// TODO: Replace with real user ID from JWT when auth is implemented
+
+	// Apply rate limiting to summary endpoint (per user based on context)
+	a.Echo.POST("/summaries", summaryHandler.GenerateSummary, middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+		Store: rateLimiterStore,
+		IdentifierExtractor: func(c echo.Context) (string, error) {
+			// Extract user ID from context for per-user rate limiting
+			userID := auth.GetUserID(c)
+			return userID, nil
+		},
+	}))
 }
 
 // healthCheck handler checks application and database health
