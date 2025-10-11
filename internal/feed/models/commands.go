@@ -20,22 +20,41 @@ type UpdateFeedCommand struct {
 
 // ToInsert converts CreateFeedCommand to database.PublicFeedsInsert.
 // UserID must be set separately by the handler from authenticated session.
+// Sets fetch_after to NOW() + 5 minutes to prevent race conditions with background job.
 func (c CreateFeedCommand) ToInsert(userID string) database.PublicFeedsInsert {
+	fetchAfter := "NOW() + INTERVAL '5 minutes'"
+
 	return database.PublicFeedsInsert{
-		Name:   c.Name,
-		Url:    c.URL,
-		UserId: userID,
+		Name:       c.Name,
+		Url:        c.URL,
+		UserId:     userID,
+		FetchAfter: &fetchAfter,
 		// CreatedAt, UpdatedAt, Id will be set by database
 		// LastFetchStatus, LastFetchError will be set by background job
 	}
 }
 
 // ToUpdate converts UpdateFeedCommand to database.PublicFeedsUpdate.
-// Only updates Name and URL fields; other fields remain unchanged.
+// Only updates Name field; other fields remain unchanged.
 func (c UpdateFeedCommand) ToUpdate() database.PublicFeedsUpdate {
 	return database.PublicFeedsUpdate{
 		Name: &c.Name,
-		Url:  &c.URL,
 		// Other fields intentionally nil to avoid updating them
+	}
+}
+
+// ToUpdateWithURLChange converts UpdateFeedCommand to database.PublicFeedsUpdate when URL has changed.
+// Resets fetch-related fields
+func (c UpdateFeedCommand) ToUpdateWithURLChange() database.PublicFeedsUpdate {
+	fetchAfter := "NOW() + INTERVAL '5 minutes'"
+
+	return database.PublicFeedsUpdate{
+		Name:            &c.Name,
+		Url:             &c.URL,
+		LastFetchStatus: nil, // Reset status
+		LastFetchError:  nil, // Reset error
+		LastModified:    nil, // Reset Last-Modified header
+		Etag:            nil, // Reset ETag header
+		FetchAfter:      &fetchAfter,
 	}
 }

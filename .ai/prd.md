@@ -118,6 +118,19 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
   2.  Każdy element listy pokazuje nazwę feedu.
   3.  Jeśli system napotkał problem podczas ostatniej próby pobrania danych z feedu (np. błąd 404, błąd serwera), obok nazwy feedu wyświetlana jest ikona błędu.
   4.  Po najechaniu kursorem myszy na ikonę błędu, wyświetla się dymek (tooltip) z krótkim, zrozumiałym opisem problemu (np. "Nie udało się pobrać danych z tego adresu URL").
+  5.  System zapewnia efektywną nawigację dla dużej liczby feedów (paginacja lub równoważny mechanizm).
+
+---
+
+- ID: US-011
+- Tytuł: Filtrowanie i wyszukiwanie feedów
+- Opis: Jako użytkownik z wieloma feedami, chcę móc szybko znaleźć konkretne źródło lub wyświetlić tylko feedy wymagające uwagi, abym nie musiał przeszukiwać całej listy ręcznie.
+- Kryteria akceptacji:
+  1.  Użytkownik może wyszukać feed po nazwie za pomocą pola tekstowego.
+  2.  Użytkownik może filtrować feedy według statusu: "Wszystkie", "Działające", "Z błędami".
+  3.  Użytkownik może łączyć wyszukiwanie z filtrem statusu.
+  4.  Wyszukiwanie i filtrowanie nie wymaga przeładowania całej strony.
+  5.  Gdy brak wyników, wyświetlany jest komunikat "Nie znaleziono feedów".
 
 ---
 

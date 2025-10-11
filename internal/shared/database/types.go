@@ -2,9 +2,13 @@ package database
 
 type PublicFeedsSelect struct {
 	CreatedAt       string  `json:"created_at"`
+	Etag            *string `json:"etag"`
+	FetchAfter      *string `json:"fetch_after"`
 	Id              string  `json:"id"`
 	LastFetchError  *string `json:"last_fetch_error"`
 	LastFetchStatus *string `json:"last_fetch_status"`
+	LastFetchedAt   *string `json:"last_fetched_at"`
+	LastModified    *string `json:"last_modified"`
 	Name            string  `json:"name"`
 	UpdatedAt       string  `json:"updated_at"`
 	Url             string  `json:"url"`
@@ -13,9 +17,13 @@ type PublicFeedsSelect struct {
 
 type PublicFeedsInsert struct {
 	CreatedAt       *string `json:"created_at"`
+	Etag            *string `json:"etag"`
+	FetchAfter      *string `json:"fetch_after"`
 	Id              *string `json:"id"`
 	LastFetchError  *string `json:"last_fetch_error"`
 	LastFetchStatus *string `json:"last_fetch_status"`
+	LastFetchedAt   *string `json:"last_fetched_at"`
+	LastModified    *string `json:"last_modified"`
 	Name            string  `json:"name"`
 	UpdatedAt       *string `json:"updated_at"`
 	Url             string  `json:"url"`
@@ -24,9 +32,13 @@ type PublicFeedsInsert struct {
 
 type PublicFeedsUpdate struct {
 	CreatedAt       *string `json:"created_at"`
+	Etag            *string `json:"etag"`
+	FetchAfter      *string `json:"fetch_after"`
 	Id              *string `json:"id"`
 	LastFetchError  *string `json:"last_fetch_error"`
 	LastFetchStatus *string `json:"last_fetch_status"`
+	LastFetchedAt   *string `json:"last_fetched_at"`
+	LastModified    *string `json:"last_modified"`
 	Name            *string `json:"name"`
 	UpdatedAt       *string `json:"updated_at"`
 	Url             *string `json:"url"`

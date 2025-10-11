@@ -11,6 +11,17 @@ import (
 type FeedListViewModel struct {
 	Feeds          []FeedItemViewModel `json:"feeds"`
 	ShowEmptyState bool                `json:"show_empty_state"`
+	Pagination     PaginationViewModel `json:"pagination"`
+}
+
+// PaginationViewModel represents pagination information for feed list.
+// Used by: GET /feeds
+type PaginationViewModel struct {
+	CurrentPage int  `json:"current_page"`
+	TotalPages  int  `json:"total_pages"`
+	TotalItems  int  `json:"total_items"`
+	HasPrevious bool `json:"has_previous"`
+	HasNext     bool `json:"has_next"`
 }
 
 // FeedItemViewModel represents a single feed item for display.
@@ -40,12 +51,6 @@ type FeedFormErrorViewModel struct {
 	NameError    string `json:"name_error,omitempty"`
 	URLError     string `json:"url_error,omitempty"`
 	GeneralError string `json:"general_error,omitempty"`
-}
-
-// FeedDeleteSuccessViewModel represents successful feed deletion response.
-// Used by: DELETE /feeds/{id}
-type FeedDeleteSuccessViewModel struct {
-	Message string `json:"message"`
 }
 
 // NewFeedItemFromDB creates a FeedItemViewModel from database.PublicFeedsSelect.

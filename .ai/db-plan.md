@@ -6,16 +6,20 @@
 
 Stores RSS feed sources added by users.
 
-| Column              | Type          | Constraints                                            | Description                                                 |
-| ------------------- | ------------- | ------------------------------------------------------ | ----------------------------------------------------------- |
-| `id`                | `UUID`        | `PRIMARY KEY DEFAULT gen_random_uuid()`                | Unique identifier for the feed                              |
-| `user_id`           | `UUID`        | `NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE` | Reference to the user who owns this feed                    |
-| `name`              | `TEXT`        | `NOT NULL`                                             | User-defined name for the feed                              |
-| `url`               | `TEXT`        | `NOT NULL`                                             | RSS feed URL                                                |
-| `last_fetch_status` | `TEXT`        | `NULL`                                                 | Status of the last fetch attempt (e.g., 'success', 'error') |
-| `last_fetch_error`  | `TEXT`        | `NULL`                                                 | Error message from the last failed fetch attempt            |
-| `created_at`        | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()`                               | Timestamp when the feed was created                         |
-| `updated_at`        | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()`                               | Timestamp when the feed was last updated                    |
+| Column              | Type           | Constraints                                            | Description                                        |
+| ------------------- | -------------- | ------------------------------------------------------ | -------------------------------------------------- |
+| `id`                | `UUID`         | `PRIMARY KEY DEFAULT gen_random_uuid()`                | Unique identifier for the feed                     |
+| `user_id`           | `UUID`         | `NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE` | Reference to the user who owns this feed           |
+| `name`              | `TEXT`         | `NOT NULL`                                             | User-defined name for the feed                     |
+| `url`               | `TEXT`         | `NOT NULL`                                             | RSS feed URL                                       |
+| `last_fetch_status` | `TEXT`         | `NULL`                                                 | Status of the last fetch attempt                   |
+| `last_fetch_error`  | `TEXT`         | `NULL`                                                 | Error message from the last failed fetch attempt   |
+| `last_fetched_at`   | `TIMESTAMPTZ`  | `NULL`                                                 | When the feed was last fetched                     |
+| `last_modified`     | `VARCHAR(255)` | `NULL`                                                 | HTTP Last-Modified header for conditional requests |
+| `etag`              | `VARCHAR(255)` | `NULL`                                                 | HTTP ETag header for conditional requests          |
+| `fetch_after`       | `TIMESTAMPTZ`  | `NULL`                                                 | Earliest time to fetch this feed                   |
+| `created_at`        | `TIMESTAMPTZ`  | `NOT NULL DEFAULT NOW()`                               | Timestamp when the feed was created                |
+| `updated_at`        | `TIMESTAMPTZ`  | `NOT NULL DEFAULT NOW()`                               | Timestamp when the feed was last updated           |
 
 **Constraints:**
 
@@ -123,26 +127,27 @@ auth.users (Supabase built-in)
 ### 3.1 Performance Indexes
 
 ```sql
--- Foreign key indexes for join performance
-CREATE INDEX idx_feeds_user_id ON feeds(user_id);
-CREATE INDEX idx_articles_feed_id ON articles(feed_id);
-CREATE INDEX idx_summaries_user_id ON summaries(user_id);
-CREATE INDEX idx_events_user_id ON events(user_id);
-
 -- Query optimization indexes
-CREATE INDEX idx_articles_published_at ON articles(published_at DESC);
+CREATE INDEX idx_feeds_user_name ON feeds(user_id, LOWER(name));
+CREATE INDEX idx_feeds_user_status ON feeds(user_id, last_fetch_status) WHERE last_fetch_status IS NOT NULL;
+CREATE INDEX idx_feeds_last_fetched ON feeds(last_fetched_at NULLS FIRST);
+CREATE INDEX idx_articles_feed_published ON articles(feed_id, published_at DESC);
+CREATE INDEX idx_summaries_user_created ON summaries(user_id, created_at DESC);
+CREATE INDEX idx_events_user_created ON events(user_id, created_at DESC);
 CREATE INDEX idx_events_event_type ON events(event_type);
-CREATE INDEX idx_events_created_at ON events(created_at DESC);
-CREATE INDEX idx_summaries_created_at ON summaries(created_at DESC);
 ```
 
 ### 3.2 Index Justifications
 
-- **Foreign key indexes**: Optimize joins and cascade operations
-- **idx_articles_published_at**: Enables efficient filtering for last 24 hours of articles during summary generation
-- **idx_events_event_type**: Speeds up event analytics queries filtering by type
-- **idx_events_created_at**: Optimizes time-based event analytics (e.g., weekly engagement metrics)
-- **idx_summaries_created_at**: Enables fast retrieval of the most recent summary per user
+All composite indexes serve dual purposes: optimizing specific queries and providing FK index coverage via prefix matching.
+
+- **idx_feeds_user_name**: Case-insensitive feed name search within user's feeds
+- **idx_feeds_user_status**: Status filtering within user's feeds
+- **idx_feeds_last_fetched**: Bot feed selection ordering by last fetch time
+- **idx_articles_feed_published**: Recent articles retrieval for summary generation
+- **idx_summaries_user_created**: Latest summary per user lookup
+- **idx_events_user_created**: Time-based event analytics per user
+- **idx_events_event_type**: Global event analytics by type
 
 ---
 

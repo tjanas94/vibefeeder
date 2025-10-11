@@ -18,7 +18,7 @@
 
 #### GET /dashboard
 
-Main application view showing feeds and latest summary.
+Main application view with layout, filters, and containers for user/feeds/summary loaded via htmx.
 
 **Query Parameters:** None
 
@@ -28,36 +28,19 @@ Main application view showing feeds and latest summary.
 
 ```go
 type DashboardViewModel struct {
-    User UserInfo
-    Feeds []FeedItemViewModel
-    LatestSummary *SummaryViewModel
-    ShowEmptyState bool
-}
-
-type UserInfo struct {
-    Email string
-}
-
-type FeedItemViewModel struct {
-    ID string
-    Name string
-    URL string
-    HasError bool
-    ErrorMessage string
-    UpdatedAt time.Time
-}
-
-type SummaryViewModel struct {
-    ID string
-    Content string
-    CreatedAt time.Time
+    // Empty - all data loaded via htmx
 }
 ```
 
 **Success Response:**
 
 - HTTP 200 OK
-- Renders: Complete dashboard page with feed list and summary sections
+- Renders: Complete dashboard page with:
+  - Empty container `#user-info-container` (loaded by `hx-get="/auth/me" hx-trigger="load"`)
+  - Feed filter form (search and status select)
+  - Feed add form
+  - Empty container `#feed-list-container` (loaded by `hx-get="/feeds" hx-trigger="load"`)
+  - Empty container `#summary-container` (loaded by `hx-get="/summaries/latest" hx-trigger="load"`)
 
 **Error Responses:**
 
@@ -69,15 +52,28 @@ type SummaryViewModel struct {
 
 **Side Effects:** None
 
+**htmx Integration:**
+
+- Dashboard renders only layout and filter forms, all content loaded via htmx
+- User info container uses `hx-get="/auth/me"` with `hx-trigger="load"`
+- Feed list container uses `hx-get="/feeds"` with `hx-trigger="load"`
+- Summary container uses `hx-get="/summaries/latest"` with `hx-trigger="load"`
+- All feed mutations (POST, DELETE) use `hx-include="#feed-filters"` to preserve filters
+
 ---
 
 ### 2.3 Feeds Management
 
 #### GET /feeds
 
-List all feeds for authenticated user (returns HTML partial).
+List all feeds for authenticated user (returns HTML partial for htmx).
 
-**Query Parameters:** None
+**Query Parameters:**
+
+- `search` (optional): string - Case-insensitive search by feed name
+- `status` (optional): enum - Filter by feed status. Values: `all`, `working`, `error`. Default: `all`
+- `page` (optional): integer - Page number (1-indexed). Default: `1`
+- `limit` (optional): integer - Items per page. Default: `20`, Max: `100`
 
 **Request Formdata:** None (GET request)
 
@@ -87,6 +83,7 @@ List all feeds for authenticated user (returns HTML partial).
 type FeedListViewModel struct {
     Feeds []FeedItemViewModel
     ShowEmptyState bool
+    Pagination PaginationViewModel
 }
 
 type FeedItemViewModel struct {
@@ -97,15 +94,26 @@ type FeedItemViewModel struct {
     ErrorMessage string
     UpdatedAt time.Time
 }
+
+type PaginationViewModel struct {
+    CurrentPage int
+    TotalPages int
+    TotalItems int
+    HasPrevious bool
+    HasNext bool
+}
 ```
 
 **Success Response:**
 
 - HTTP 200 OK
-- Renders: Feed list partial HTML (for htmx swap)
+- Renders: Feed list partial HTML (for htmx swap into `#feed-list-container`)
 
 **Error Responses:**
 
+- 400 Bad Request
+  - HTTP 400
+  - Renders: Error message partial "Invalid query parameters"
 - 401 Unauthorized
   - HTTP 401
   - Renders: Login redirect partial or error message
@@ -115,11 +123,19 @@ type FeedItemViewModel struct {
 
 **Side Effects:** None
 
+**htmx Notes:**
+
+- Called on dashboard load with `hx-trigger="load"`
+- Called by filter form with `hx-trigger="input changed delay:500ms from:#search, change from:#status"`
+- Pagination links use `hx-include="#feed-filters"` to preserve filter state
+- Listens for `refreshFeedList` event: `hx-trigger="load, refreshFeedList from:body"`
+- Triggered by successful POST /feeds, POST /feeds/{id}, and DELETE /feeds/{id} operations
+
 ---
 
 #### POST /feeds
 
-Create a new RSS feed.
+Create a new RSS feed and trigger feed list refresh.
 
 **Query Parameters:** None
 
@@ -132,12 +148,9 @@ url: string (required, valid URL format)
 
 **View Model (Templ):**
 
-```go
-type FeedListViewModel struct {
-    Feeds []FeedItemViewModel
-    ShowEmptyState bool
-}
+Error only:
 
+```go
 type FeedFormErrorViewModel struct {
     NameError string
     URLError string
@@ -147,15 +160,16 @@ type FeedFormErrorViewModel struct {
 
 **Success Response:**
 
-- HTTP 200 OK
-- Renders: Updated feed list partial HTML with new feed included
+- HTTP 204 No Content
+- Header: `HX-Trigger: refreshFeedList`
+- Triggers `GET /feeds` on `#feed-list-container` to refresh the list
 
 **Error Responses:**
 
 - 400 Bad Request
   - Renders: `FeedFormErrorViewModel` with specific field errors:
     - `NameError = "Feed name is required"`
-    - `URLError = "Invalid URL format"` or "Unable to fetch feed from this URL"`
+    - `URLError = "Invalid URL format"`
 - 409 Conflict
   - Renders: `FeedFormErrorViewModel` with `URLError = "You have already added this feed"`
 - 500 Internal Server Error
@@ -163,10 +177,15 @@ type FeedFormErrorViewModel struct {
 
 **Side Effects:**
 
-- Creates new record in `feeds` table
-- Validates URL by attempting to fetch feed metadata
+- Creates new record in `feeds` table with `fetch_after = NOW() + INTERVAL '5 minutes'`
 - Records `feed_added` event in `events` table
-- Triggers immediate article fetch for new feed (async)
+- Background job will fetch articles after 5 minutes
+
+**htmx Notes:**
+
+- Form uses `hx-swap="none"` to ignore response body (only cares about HX-Trigger header)
+- `#feed-list-container` listens for `refreshFeedList` event and calls `GET /feeds` with current filters
+- Clean separation: POST only mutates, GET only renders
 
 ---
 
@@ -211,7 +230,7 @@ type FeedEditFormViewModel struct {
 
 #### POST /feeds/{id}
 
-Update existing feed.
+Update existing feed and trigger feed list refresh.
 
 **Query Parameters:** None
 
@@ -224,16 +243,9 @@ url: string (required, valid URL format)
 
 **View Model (Templ):**
 
-```go
-type FeedItemViewModel struct {
-    ID string
-    Name string
-    URL string
-    HasError bool
-    ErrorMessage string
-    UpdatedAt time.Time
-}
+Error only:
 
+```go
 type FeedFormErrorViewModel struct {
     NameError string
     URLError string
@@ -243,8 +255,9 @@ type FeedFormErrorViewModel struct {
 
 **Success Response:**
 
-- HTTP 200 OK
-- Renders: Updated feed item partial HTML
+- HTTP 204 No Content
+- Header: `HX-Trigger: refreshFeedList`
+- Triggers `GET /feeds` on `#feed-list-container` to refresh the list
 
 **Error Responses:**
 
@@ -261,15 +274,24 @@ type FeedFormErrorViewModel struct {
 **Side Effects:**
 
 - Updates record in `feeds` table
-- Validates URL by attempting to fetch feed metadata
-- Resets `last_fetch_status` and `last_fetch_error` if URL changed
-- Triggers immediate article fetch if URL changed (async)
+- If URL changed:
+  - Resets `last_fetch_status`, `last_fetch_error`, `last_modified`, `etag` to NULL
+  - Sets `fetch_after = NOW() + INTERVAL '5 minutes'`
+  - Background job will fetch articles after 5 minutes
+- If only name changed:
+  - Only updates `name` field
+
+**htmx Notes:**
+
+- Form uses `hx-swap="none"` to ignore response body
+- `#feed-list-container` listens for `refreshFeedList` event and calls `GET /feeds` with current filters
+- Clean separation: POST only mutates, GET only renders
 
 ---
 
 #### DELETE /feeds/{id}
 
-Delete a feed and all associated articles.
+Delete a feed and all associated articles, trigger feed list refresh.
 
 **Query Parameters:** None
 
@@ -277,16 +299,13 @@ Delete a feed and all associated articles.
 
 **View Model (Templ):**
 
-```go
-type FeedDeleteSuccessViewModel struct {
-    Message string
-}
-```
+None (no view model for success, errors render partials)
 
 **Success Response:**
 
-- HTTP 200 OK
-- Renders: Success message partial "Feed deleted successfully" or triggers list refresh
+- HTTP 204 No Content
+- Header: `HX-Trigger: refreshFeedList`
+- Triggers `GET /feeds` on `#feed-list-container` to refresh the list
 
 **Error Responses:**
 
@@ -304,6 +323,12 @@ type FeedDeleteSuccessViewModel struct {
 
 - Deletes record from `feeds` table
 - Cascading deletion of associated `articles` records (via database FK constraint)
+
+**htmx Notes:**
+
+- Delete button uses `hx-swap="none"` to ignore response body
+- `#feed-list-container` listens for `refreshFeedList` event and calls `GET /feeds` with current filters
+- Clean separation: DELETE only mutates, GET only renders
 
 ---
 
@@ -473,26 +498,19 @@ All endpoints except:
 - Required: Yes
 - Constraints:
   - Valid URL format (must start with http:// or https://)
-  - Must be accessible (HTTP HEAD request returns 2xx)
-  - Must return valid RSS feed XML
   - Unique per user (enforced by database constraint)
 - Error messages:
   - Empty: "Feed URL is required"
   - Invalid format: "Invalid URL format. Must start with http:// or https://"
-  - Inaccessible: "Unable to fetch feed from this URL. Please check the address."
-  - Invalid feed: "This URL does not point to a valid RSS feed"
   - Duplicate: "You have already added this feed"
 
 **Validation Process:**
 
 1. Trim whitespace from name and url
 2. Check required fields are non-empty
-3. Validate URL format using regex
-4. Attempt HTTP HEAD request to URL
-5. If HEAD succeeds, attempt GET request
-6. Parse response as XML and validate RSS structure
-7. Check for duplicate URL in user's feeds
-8. If all pass, accept feed
+3. Validate URL format using regex (must start with http:// or https://)
+4. Check for duplicate URL in user's feeds
+5. If all pass, accept feed (actual feed validation happens in background job)
 
 #### Summaries
 
@@ -545,31 +563,42 @@ All endpoints except:
 #### Feed Addition Flow
 
 1. Validate form input (name non-empty, url valid format)
-2. Attempt to fetch feed URL:
-   - HTTP HEAD request with 10-second timeout
-   - If fails, return 400 with error "Unable to fetch feed from this URL"
-3. Attempt to parse feed:
-   - HTTP GET request with 10-second timeout
-   - Parse as XML
-   - Validate RSS 2.0 structure
-   - If fails, return 400 with error "This URL does not point to a valid RSS feed"
-4. Check for duplicate: `SELECT COUNT(*) FROM feeds WHERE user_id = ? AND url = ?`
+2. Check for duplicate: `SELECT COUNT(*) FROM feeds WHERE user_id = ? AND url = ?`
    - If exists, return 409 with error "You have already added this feed"
-5. Insert feed: `INSERT INTO feeds (user_id, name, url, last_fetch_status) VALUES (?, ?, ?, 'pending')`
-6. Record `feed_added` event: `INSERT INTO events (user_id, event_type, metadata) VALUES (?, 'feed_added', '{"feed_id": "..."}')`
-7. Trigger async article fetch job for this feed
-8. Return updated feed list HTML partial
+3. Insert feed: `INSERT INTO feeds (user_id, name, url, fetch_after) VALUES (?, ?, ?, NOW() + INTERVAL '5 minutes')`
+4. Record `feed_added` event: `INSERT INTO events (user_id, event_type, metadata) VALUES (?, 'feed_added', '{"feed_id": "..."}')`
+5. Enqueue feed for fetch: Push `{feed_id, url}` to fetch queue
+6. Return updated feed list HTML partial
 
 #### Feed Update Flow
 
 1. Validate ownership: check feed belongs to authenticated user (RLS handles this)
 2. Validate form input (name non-empty, url valid format)
-3. If URL changed, perform same validation as Feed Addition (steps 2-3)
-4. Check for duplicate if URL changed: `SELECT COUNT(*) FROM feeds WHERE user_id = ? AND url = ? AND id != ?`
-5. Update feed: `UPDATE feeds SET name = ?, url = ?, last_fetch_status = ?, last_fetch_error = NULL WHERE id = ?`
-   - Set `last_fetch_status = 'pending'` if URL changed
-6. If URL changed, trigger async article fetch job for this feed
-7. Return updated feed item HTML partial
+3. Check for duplicate if URL changed: `SELECT COUNT(*) FROM feeds WHERE user_id = ? AND url = ? AND id != ?`
+   - If exists, return 409 with error "A feed with this URL already exists"
+4. Update feed:
+   - If URL changed:
+
+     ```sql
+     UPDATE feeds SET
+       name = ?,
+       url = ?,
+       last_fetch_status = NULL,
+       last_fetch_error = NULL,
+       last_modified = NULL,
+       etag = NULL,
+       fetch_after = NOW() + INTERVAL '5 minutes'
+     WHERE id = ?
+     ```
+
+     - Enqueue feed for fetch: Push `{feed_id, url}` to fetch queue
+
+   - If only name changed:
+     ```sql
+     UPDATE feeds SET name = ? WHERE id = ?
+     ```
+
+5. Return updated feed item HTML partial
 
 #### Feed Deletion Flow
 
@@ -583,7 +612,8 @@ All endpoints except:
 1. Check user has working feeds:
    ```sql
    SELECT COUNT(*) FROM feeds
-   WHERE user_id = ? AND (last_fetch_status = 'success' OR last_fetch_status IS NULL)
+   WHERE user_id = ?
+     AND last_fetch_status NOT IN ('permanent_error', 'unauthorized')
    ```
 2. If count = 0, return 400 with error
 3. Query articles from last 24 hours:
@@ -619,24 +649,168 @@ All endpoints except:
 
 #### Article Fetch Background Job
 
-**Trigger:** Runs every 1 hour via cron job
+**Architecture:** Single process with goroutine worker pool consuming from buffered channel (Go channel acts as in-memory queue)
+
+**Queue Configuration:**
+
+- Channel buffer size: 10,000 (configurable)
+- Worker pool size: configurable (recommended: 10-50 workers)
+- Non-blocking push from cron job and handlers (graceful degradation when queue full)
+
+**Trigger:** Runs every 5 minutes
+
+**Race Condition Prevention:**
+
+- New/updated feeds always created with `fetch_after = NOW() + 5 minutes`
+- No immediate fetch from HTTP handlers = no race with cron job
+- Single instance architecture = single cron job = no concurrent SELECT
+- Channel guarantees atomic reads = each worker gets unique feed
+- `fetch_after` acts as sufficient lock for single instance MVP
+
+**Feed Status Values:**
+
+- `success` - Feed fetched successfully, schedule next fetch in 1 hour (`fetch_after = NOW() + 1 hour`)
+- `temporary_error` - Transient failure (timeout, 5xx), retry with exponential backoff (respect `fetch_after`)
+- `permanent_error` - Unrecoverable error (404, 410, 200 with invalid content-type), never fetch again (`fetch_after = NULL`)
+- `unauthorized` - Authentication required (401, 403), never fetch again (`fetch_after = NULL`)
 
 **Process:**
 
-1. Get all feeds: `SELECT id, url FROM feeds WHERE last_fetch_status != 'disabled'`
+1. Get feeds ready for fetching (ordered by priority):
+
+   ```sql
+   SELECT id, url, last_modified, etag, last_fetch_status
+   FROM feeds
+   WHERE last_fetch_status NOT IN ('permanent_error', 'unauthorized')
+     AND (fetch_after IS NULL OR fetch_after <= NOW())
+   ORDER BY last_fetched_at NULLS FIRST
+   LIMIT 1000
+   ```
+
 2. For each feed:
-   - Fetch feed URL with 30-second timeout
-   - Parse XML and extract articles
-   - For each article:
-     - Check if exists: `SELECT COUNT(*) FROM articles WHERE feed_id = ? AND url = ?`
-     - If not exists: `INSERT INTO articles (feed_id, title, url, content, published_at) VALUES (...)`
-   - Update feed status: `UPDATE feeds SET last_fetch_status = 'success', last_fetch_error = NULL, updated_at = NOW() WHERE id = ?`
-   - If any error occurs:
-     - Update feed status: `UPDATE feeds SET last_fetch_status = 'error', last_fetch_error = ? WHERE id = ?`
-3. Log job completion with stats (total feeds processed, new articles added, errors encountered)
+   - **Prepare HTTP request** with conditional headers:
+     - If `last_modified` exists: add `If-Modified-Since` header
+     - If `etag` exists: add `If-None-Match` header
+   - **Fetch feed URL** with 30-second timeout
+   - **Handle HTTP responses:**
+     - **304 Not Modified**:
+       - Update feed on success (continue to step 4)
+     - **200 OK**:
+       - Validate `Content-Type` (must be `application/rss+xml`, `application/xml`, `text/xml`, or contain `xml`)
+       - If invalid content-type → set status to `permanent_error`
+       - Parse XML and validate RSS structure
+       - If invalid XML → set status to `permanent_error`
+       - Extract articles (continue to step 3)
+     - **301 Moved Permanently / 308 Permanent Redirect**:
+       - Follow redirect (up to 5 redirects max)
+       - Update feed URL in database to new location
+       - Process response from new URL
+     - **302 Found / 307 Temporary Redirect**:
+       - Follow redirect (up to 5 redirects max)
+       - Do NOT update feed URL in database
+       - Process response from redirected URL
+     - **400 Bad Request**:
+       ```sql
+       UPDATE feeds SET
+         last_fetch_status = 'permanent_error',
+         last_fetch_error = 'Invalid request',
+         last_fetched_at = NOW(),
+         fetch_after = NULL
+       WHERE id = ?
+       ```
+     - **401 Unauthorized / 403 Forbidden**:
+       ```sql
+       UPDATE feeds SET
+         last_fetch_status = 'unauthorized',
+         last_fetch_error = 'Authentication required',
+         last_fetched_at = NOW(),
+         fetch_after = NULL
+       WHERE id = ?
+       ```
+     - **404 Not Found / 410 Gone**:
+       ```sql
+       UPDATE feeds SET
+         last_fetch_status = 'permanent_error',
+         last_fetch_error = 'Feed no longer available',
+         last_fetched_at = NOW(),
+         fetch_after = NULL
+       WHERE id = ?
+       ```
+     - **429 Too Many Requests**:
+       - Read `Retry-After` header (in seconds or HTTP date)
+       - Set `fetch_after` to specified time
+       - If no `Retry-After` header, use exponential backoff
+       ```sql
+       UPDATE feeds SET
+         last_fetch_status = 'temporary_error',
+         last_fetch_error = 'Rate limited',
+         last_fetched_at = NOW(),
+         fetch_after = ? -- from Retry-After header or exponential backoff
+       WHERE id = ?
+       ```
+     - **5xx Server Errors / Timeouts**:
+       - Apply exponential backoff: 5min → 15min → 1h → 6h (based on consecutive failures)
+       ```sql
+       UPDATE feeds SET
+         last_fetch_status = 'temporary_error',
+         last_fetch_error = ?,
+         last_fetched_at = NOW(),
+         fetch_after = NOW() + INTERVAL '...' -- exponential backoff
+       WHERE id = ?
+       ```
+
+3. **For each article** (if feed returned 200 OK with valid XML):
+   - Check if exists: `SELECT COUNT(*) FROM articles WHERE feed_id = ? AND url = ?`
+   - If not exists: `INSERT INTO articles (feed_id, title, url, content, published_at) VALUES (...)`
+
+4. **Update feed on success**:
+
+   ```sql
+   UPDATE feeds SET
+     last_fetch_status = 'success',
+     last_fetch_error = NULL,
+     last_fetched_at = NOW(),
+     last_modified = ?, -- from response headers
+     etag = ?,          -- from response headers
+     fetch_after = NOW() + INTERVAL '...' -- from cache headers or default 1 hour
+   WHERE id = ?
+   ```
+
+5. Log job completion with stats (feeds processed, 304 responses, new articles, errors by type)
+
+**Polite Bot Features:**
+
+- **Conditional Requests**: Uses `Last-Modified` and `ETag` headers to avoid redundant downloads (HTTP 304)
+- **Respect Retry-After**: Honors `Retry-After` header from 429 responses
+- **Exponential Backoff**: Applies increasing delays for `temporary_error` feeds (5min → 15min → 1h → 6h → 24h)
+- **Permanent Error Handling**: Never retries `permanent_error` or `unauthorized` feeds
+- **Fetch Scheduling**: Uses `fetch_after` column to prevent premature retries
+- **Success Scheduling**: Successful fetches are scheduled 1 hour later
+- **Priority Queue**: Fetches never-fetched feeds first (NULLS FIRST), then by oldest `last_fetched_at`
+- **Content-Type Validation**: Rejects non-XML responses as permanent errors
+- **Domain Concurrency Control**: Only 1 concurrent request per domain (sync.Map with per-domain locks)
 
 **Error Handling:**
 
 - Individual feed errors don't stop the job
 - Errors logged to `feeds.last_fetch_error` for user visibility
 - Critical errors (database unavailable) stop job and alert admin
+- Network timeouts and temporary errors trigger exponential backoff
+- Permanent errors (404, 410, invalid content-type) prevent future fetches
+- Authorization errors (401, 403) prevent future fetches
+
+**Resource Limits:**
+
+- Max 10MB response size
+- Max 50 articles processed per feed fetch
+
+**SSRF Protection:**
+
+- Block private/loopback/link-local IPs (10.x.x.x, 192.168.x.x, 172.16.x.x, 127.x.x.x, 169.254.x.x, ::1)
+- Allow only http:// and https:// schemes (block file://, ftp://, etc.)
+- Validate URLs at three points:
+  1. POST /feeds - before saving to database
+  2. Before fetch - in background job (DNS rebinding protection)
+  3. On redirects - before following (prevent redirect-based SSRF)
+- Custom HTTP transport validates IPs during connection establishment
+- Limit redirect chain to 5 hops maximum
