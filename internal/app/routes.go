@@ -5,7 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/tjanas94/vibefeeder/internal/home"
+	"github.com/tjanas94/vibefeeder/internal/dashboard"
 	"github.com/tjanas94/vibefeeder/internal/shared/ai"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
 	"github.com/tjanas94/vibefeeder/internal/summary"
@@ -17,9 +17,14 @@ func (a *App) setupRoutes() {
 	// Health check endpoint
 	a.Echo.GET("/healthz", a.healthCheck)
 
-	// Home routes
-	homeHandler := home.NewHandler(a.DB)
-	a.Echo.GET("/", homeHandler.Index)
+	// Redirect root to dashboard
+	a.Echo.GET("/", func(c echo.Context) error {
+		return c.Redirect(http.StatusFound, "/dashboard")
+	})
+
+	// Dashboard routes (authenticated)
+	dashboardHandler := dashboard.NewHandler(a.Logger)
+	a.Echo.GET("/dashboard", dashboardHandler.ShowDashboard)
 
 	// Summary routes (authenticated with rate limiting)
 	aiClient := ai.NewOpenRouterClient(a.Config.OpenRouter.APIKey)

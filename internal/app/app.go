@@ -62,6 +62,9 @@ func New() (*App, error) {
 		Logger: log,
 	}
 
+	// Register custom error handler
+	e.HTTPErrorHandler = app.customErrorHandler
+
 	// Setup middleware
 	app.setupMiddleware()
 

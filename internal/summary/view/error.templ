@@ -2,16 +2,13 @@ package view
 
 import (
 	"fmt"
-	sharedview "github.com/tjanas94/vibefeeder/internal/shared/view"
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 )
 
 // Error renders the summary error component (debug version)
 templ Error(vm models.SummaryErrorViewModel) {
-	@sharedview.Layout("Summary Error - VibeFeeder") {
-		<div class="p-4">
-			<h1 class="text-2xl font-bold mb-4">internal/summary/view/error.templ</h1>
-			<pre class="bg-gray-100 p-4 rounded">{ fmt.Sprintf("%+v", vm) }</pre>
-		</div>
-	}
+	<div class="p-4">
+		<h1 class="text-2xl font-bold mb-4">internal/summary/view/error.templ</h1>
+		<pre>{ fmt.Sprintf("%+v", vm) }</pre>
+	</div>
 }

@@ -97,7 +97,7 @@ Zdefiniowane zostaną dedykowane typy błędów w pakiecie `summary`, aby umożl
     - Wywołaj `summaryService.GenerateSummary`.
     - Zaimplementuj mapowanie błędów zwróconych z serwisu na odpowiednie odpowiedzi HTTP (renderowanie widoków `display.templ` lub `error.templ`).
 6.  **Widoki (Templ)**:
-    - W `display.templ`, stwórz komponent, który przyjmuje `SummaryDisplayViewModel` i renderuje tylko nazwę komponentu osadzoną w shared layoucie.
-    - W `error.templ`, stwórz komponent, który przyjmuje `SummaryErrorViewModel` i renderuje tylko nazwę komponentu osadzoną w shared layoucie.
+    - W `display.templ`, stwórz komponent, który przyjmuje `SummaryDisplayViewModel` i renderuje tylko nazwę komponentu i modelem widoku.
+    - W `error.templ`, stwórz komponent, który przyjmuje `SummaryErrorViewModel` i renderuje tylko nazwę komponentu i modelem widoku.
 7.  **Middleware**: Dodaj middleware do rate limitingu dla nowo utworzonego endpointu.
 8.  **Dokumentacja**: Upewnij się, że kod jest zgodny z wytycznymi z `AGENTS.md`, a nowe funkcje są udokumentowane w komentarzach, jeśli to konieczne.
