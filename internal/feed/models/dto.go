@@ -28,12 +28,12 @@ type PaginationViewModel struct {
 // Derived from database.PublicFeedsSelect with computed HasError field.
 // Used by: GET /feeds, POST /feeds, POST /feeds/{id}, GET /dashboard
 type FeedItemViewModel struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	URL          string    `json:"url"`
-	HasError     bool      `json:"has_error"`     // Computed: LastFetchError != nil
-	ErrorMessage string    `json:"error_message"` // From last_fetch_error
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	URL           string    `json:"url"`
+	HasError      bool      `json:"has_error"`     // Computed: LastFetchError != nil
+	ErrorMessage  string    `json:"error_message"` // From last_fetch_error
+	LastFetchedAt time.Time `json:"last_fetched_at"`
 }
 
 // FeedEditFormViewModel represents the feed edit form data.
@@ -68,9 +68,11 @@ func NewFeedItemFromDB(dbFeed database.PublicFeedsSelect) FeedItemViewModel {
 		vm.ErrorMessage = *dbFeed.LastFetchError
 	}
 
-	// Parse updated_at timestamp
-	if updatedAt, err := time.Parse(time.RFC3339, dbFeed.UpdatedAt); err == nil {
-		vm.UpdatedAt = updatedAt
+	// Parse last_fetched_at timestamp
+	if dbFeed.LastFetchedAt != nil {
+		if lastFetchedAt, err := time.Parse(time.RFC3339, *dbFeed.LastFetchedAt); err == nil {
+			vm.LastFetchedAt = lastFetchedAt
+		}
 	}
 
 	return vm

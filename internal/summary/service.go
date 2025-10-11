@@ -106,38 +106,16 @@ func (s *Service) checkUserHasFeeds(ctx context.Context, userID string) (bool, e
 }
 
 // fetchRecentArticles retrieves all articles published in the last 24 hours for the user's feeds
-func (s *Service) fetchRecentArticles(ctx context.Context, userID string) ([]database.PublicArticlesSelect, error) {
+func (s *Service) fetchRecentArticles(ctx context.Context, userID string) ([]models.ArticleForPrompt, error) {
 	// Calculate 24 hours ago timestamp
 	twentyFourHoursAgo := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
 
-	var articles []database.PublicArticlesSelect
+	var articles []models.ArticleForPrompt
 
 	// Query articles joined with feeds to filter by user_id
-	// We need to get feed_ids for this user first
-	var feeds []database.PublicFeedsSelect
-	_, err := s.db.From("feeds").
-		Select("id", "", false).
-		Eq("user_id", userID).
-		ExecuteTo(&feeds)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(feeds) == 0 {
-		return []database.PublicArticlesSelect{}, nil
-	}
-
-	// Extract feed IDs
-	feedIDs := make([]string, len(feeds))
-	for i, feed := range feeds {
-		feedIDs[i] = feed.Id
-	}
-
-	// Fetch articles for these feeds published in last 24h
-	_, err = s.db.From("articles").
-		Select("*", "", false).
-		In("feed_id", feedIDs).
+	_, err := s.db.From("articles").
+		Select("title, content, feeds!inner(user_id)", "", false).
+		Eq("feeds.user_id", userID).
 		Gte("published_at", twentyFourHoursAgo).
 		Order("published_at", nil).
 		ExecuteTo(&articles)

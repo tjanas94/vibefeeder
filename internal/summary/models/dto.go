@@ -6,6 +6,13 @@ import (
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
 )
 
+// ArticleForPrompt contains only the fields needed for AI prompt generation.
+// Used by: fetchRecentArticles, buildPromptFromArticles
+type ArticleForPrompt struct {
+	Title   string  `json:"title"`
+	Content *string `json:"content"`
+}
+
 // SummaryViewModel represents a single summary for display.
 // Derived from database.PublicSummariesSelect.
 // Used by: GET /summaries/latest, POST /summaries, GET /dashboard

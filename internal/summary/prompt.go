@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	"github.com/tjanas94/vibefeeder/internal/summary/models"
 )
 
 // buildPromptFromArticles creates a prompt for the AI from article data.
 // This is a pure function with no side effects.
-func buildPromptFromArticles(articles []database.PublicArticlesSelect) string {
+func buildPromptFromArticles(articles []models.ArticleForPrompt) string {
 	var sb strings.Builder
 
 	sb.WriteString("Please generate a concise summary of the following articles:\n\n")

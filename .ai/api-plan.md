@@ -1,4 +1,4 @@
-# REST API Plan - VibeFeeder
+# HTML API Plan - VibeFeeder
 
 ## 1. Resources
 
@@ -14,7 +14,7 @@
 
 ## 2. Endpoints
 
-### 2.2 Dashboard
+### 2.1 Dashboard
 
 #### GET /dashboard
 
@@ -56,13 +56,13 @@ type DashboardViewModel struct {
 
 - Dashboard renders only layout and filter forms, all content loaded via htmx
 - User info container uses `hx-get="/auth/me"` with `hx-trigger="load"`
-- Feed list container uses `hx-get="/feeds"` with `hx-trigger="load"`
+- Feed list container uses `hx-get="/feeds"` with `hx-trigger="load, refreshFeedList from:body"`
 - Summary container uses `hx-get="/summaries/latest"` with `hx-trigger="load"`
 - All feed mutations (POST, DELETE) use `hx-include="#feed-filters"` to preserve filters
 
 ---
 
-### 2.3 Feeds Management
+### 2.2 Feeds Management
 
 #### GET /feeds
 
@@ -72,6 +72,9 @@ List all feeds for authenticated user (returns HTML partial for htmx).
 
 - `search` (optional): string - Case-insensitive search by feed name
 - `status` (optional): enum - Filter by feed status. Values: `all`, `working`, `error`. Default: `all`
+  - `all` - no filter on status
+  - `working` - WHERE `last_fetch_status = 'success'`
+  - `error` - WHERE `last_fetch_status IN ('temporary_error', 'permanent_error', 'unauthorized')`
 - `page` (optional): integer - Page number (1-indexed). Default: `1`
 - `limit` (optional): integer - Items per page. Default: `20`, Max: `100`
 
@@ -92,7 +95,7 @@ type FeedItemViewModel struct {
     URL string
     HasError bool
     ErrorMessage string
-    UpdatedAt time.Time
+    LastFetchedAt time.Time
 }
 
 type PaginationViewModel struct {
@@ -126,9 +129,9 @@ type PaginationViewModel struct {
 **htmx Notes:**
 
 - Called on dashboard load with `hx-trigger="load"`
+- Listens for `refreshFeedList` event from body to refresh after mutations
 - Called by filter form with `hx-trigger="input changed delay:500ms from:#search, change from:#status"`
 - Pagination links use `hx-include="#feed-filters"` to preserve filter state
-- Listens for `refreshFeedList` event: `hx-trigger="load, refreshFeedList from:body"`
 - Triggered by successful POST /feeds, POST /feeds/{id}, and DELETE /feeds/{id} operations
 
 ---
@@ -167,12 +170,15 @@ type FeedFormErrorViewModel struct {
 **Error Responses:**
 
 - 400 Bad Request
+  - Headers: `HX-Retarget: #feed-add-form-errors`, `HX-Reswap: innerHTML`
   - Renders: `FeedFormErrorViewModel` with specific field errors:
     - `NameError = "Feed name is required"`
     - `URLError = "Invalid URL format"`
 - 409 Conflict
+  - Headers: `HX-Retarget: #feed-add-form-errors`, `HX-Reswap: innerHTML`
   - Renders: `FeedFormErrorViewModel` with `URLError = "You have already added this feed"`
 - 500 Internal Server Error
+  - Headers: `HX-Retarget: #feed-add-form-errors`, `HX-Reswap: innerHTML`
   - Renders: `FeedFormErrorViewModel` with `GeneralError = "Failed to add feed. Please try again."`
 
 **Side Effects:**
@@ -262,13 +268,17 @@ type FeedFormErrorViewModel struct {
 **Error Responses:**
 
 - 400 Bad Request
+  - Headers: `HX-Retarget: #feed-edit-form-errors-{id}`, `HX-Reswap: innerHTML`
   - Renders: `FeedFormErrorViewModel` with specific field errors
 - 404 Not Found
   - HTTP 404
+  - Headers: `HX-Retarget: #feed-edit-form-errors-{id}`, `HX-Reswap: innerHTML`
   - Renders: Error message partial "Feed not found"
 - 409 Conflict
+  - Headers: `HX-Retarget: #feed-edit-form-errors-{id}`, `HX-Reswap: innerHTML`
   - Renders: `FeedFormErrorViewModel` with `URLError = "A feed with this URL already exists"`
 - 500 Internal Server Error
+  - Headers: `HX-Retarget: #feed-edit-form-errors-{id}`, `HX-Reswap: innerHTML`
   - Renders: `FeedFormErrorViewModel` with `GeneralError = "Failed to update feed"`
 
 **Side Effects:**
@@ -311,12 +321,15 @@ None (no view model for success, errors render partials)
 
 - 401 Unauthorized
   - HTTP 401
+  - Headers: `HX-Retarget: #feed-item-{id}-errors`, `HX-Reswap: innerHTML`
   - Renders: Error message partial
 - 404 Not Found
   - HTTP 404
+  - Headers: `HX-Retarget: #feed-item-{id}-errors`, `HX-Reswap: innerHTML`
   - Renders: Error message partial "Feed not found"
 - 500 Internal Server Error
   - HTTP 500
+  - Headers: `HX-Retarget: #feed-item-{id}-errors`, `HX-Reswap: innerHTML`
   - Renders: Error message partial "Failed to delete feed"
 
 **Side Effects:**
@@ -332,7 +345,7 @@ None (no view model for success, errors render partials)
 
 ---
 
-### 2.4 Summaries
+### 2.3 Summaries
 
 #### GET /summaries/latest
 
@@ -516,14 +529,14 @@ All endpoints except:
 
 **Business Rules:**
 
-- User must have at least one feed with `last_fetch_status = 'success'`
+- User must have at least one feed
 - Must have at least one article published in the last 24 hours
 - Summary generation timeout: 60 seconds
 - If AI API fails, retry once before returning error
 
 **Validation Process:**
 
-1. Check user has feeds: `SELECT COUNT(*) FROM feeds WHERE user_id = ? AND last_fetch_status = 'success'`
+1. Check user has feeds: `SELECT COUNT(*) FROM feeds WHERE user_id = ?`
 2. If count = 0, return error "You must add at least one RSS feed before generating a summary"
 3. Query articles from last 24 hours across all user feeds
 4. If no articles found, return error "No articles found from the last 24 hours"
@@ -568,7 +581,7 @@ All endpoints except:
 3. Insert feed: `INSERT INTO feeds (user_id, name, url, fetch_after) VALUES (?, ?, ?, NOW() + INTERVAL '5 minutes')`
 4. Record `feed_added` event: `INSERT INTO events (user_id, event_type, metadata) VALUES (?, 'feed_added', '{"feed_id": "..."}')`
 5. Enqueue feed for fetch: Push `{feed_id, url}` to fetch queue
-6. Return updated feed list HTML partial
+6. Return 204 No Content with HX-Trigger header to refresh feed list
 
 #### Feed Update Flow
 
@@ -598,7 +611,7 @@ All endpoints except:
      UPDATE feeds SET name = ? WHERE id = ?
      ```
 
-5. Return updated feed item HTML partial
+5. Return 204 No Content with HX-Trigger header to refresh feed list
 
 #### Feed Deletion Flow
 
