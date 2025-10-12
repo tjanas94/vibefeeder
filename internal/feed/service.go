@@ -148,6 +148,21 @@ func (s *Service) validateURLChange(ctx context.Context, userID, feedID, newURL 
 	return nil
 }
 
+// DeleteFeed deletes a feed for the authenticated user
+func (s *Service) DeleteFeed(ctx context.Context, id, userID string) error {
+	// Delete feed from repository (includes authorization check via user_id)
+	if err := s.repo.DeleteFeed(ctx, id, userID); err != nil {
+		// Check if error indicates feed not found
+		if database.IsNotFoundError(err) {
+			return ErrFeedNotFound
+		}
+		// Return generic error for other cases
+		return fmt.Errorf("failed to delete feed: %w", err)
+	}
+
+	return nil
+}
+
 // buildFeedListViewModel is a pure function that transforms repository result to view model
 func buildFeedListViewModel(result *ListFeedsResult, query models.ListFeedsQuery) models.FeedListViewModel {
 	// Transform database models to view models

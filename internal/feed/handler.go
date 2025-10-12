@@ -246,6 +246,55 @@ func (h *Handler) renderUpdateFormError(c echo.Context, feedID string, statusCod
 	return c.Render(statusCode, "", view.FeedFormErrors(vm))
 }
 
+// DeleteFeed handles DELETE /feeds/:id endpoint
+// Deletes a feed for the authenticated user
+func (h *Handler) DeleteFeed(c echo.Context) error {
+	// Get user ID from authenticated session
+	userID := auth.GetUserID(c)
+	if userID == "" {
+		h.logger.Error("missing user_id in context")
+		return c.NoContent(http.StatusUnauthorized)
+	}
+
+	// Get and validate feed ID from path parameter
+	feedID, err := h.getFeedID(c)
+	if err != nil {
+		return h.renderDeleteError(c, "", http.StatusBadRequest, "Invalid feed ID")
+	}
+
+	// Call service to delete feed
+	if err := h.service.DeleteFeed(c.Request().Context(), feedID, userID); err != nil {
+		// Handle specific error types
+		if err == ErrFeedNotFound {
+			h.logger.Info("feed not found or unauthorized", "feed_id", feedID, "user_id", userID)
+			return h.renderDeleteError(c, feedID, http.StatusNotFound, "Feed not found")
+		}
+
+		// Handle other errors
+		h.logger.Error("failed to delete feed", "feed_id", feedID, "user_id", userID, "error", err)
+		return h.renderDeleteError(c, feedID, http.StatusInternalServerError, "Failed to delete feed")
+	}
+
+	// Success - return 204 No Content with HX-Trigger header
+	c.Response().Header().Set("HX-Trigger", "refreshFeedList")
+	return c.NoContent(http.StatusNoContent)
+}
+
+// renderDeleteError renders the error view for feed deletion with appropriate retargeting
+func (h *Handler) renderDeleteError(c echo.Context, feedID string, statusCode int, message string) error {
+	// Set htmx headers for error handling with dynamic feed ID
+	if feedID != "" {
+		targetID := fmt.Sprintf("#feed-item-%s-errors", feedID)
+		c.Response().Header().Set("HX-Retarget", targetID)
+		c.Response().Header().Set("HX-Reswap", "innerHTML")
+	}
+
+	vm := models.FeedListErrorViewModel{
+		ErrorMessage: message,
+	}
+	return c.Render(statusCode, "", view.Error(vm))
+}
+
 // renderError renders the error view with appropriate error message
 func (h *Handler) renderError(c echo.Context, statusCode int, message string) error {
 	vm := models.FeedListErrorViewModel{

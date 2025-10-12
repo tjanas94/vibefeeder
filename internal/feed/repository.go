@@ -139,3 +139,25 @@ func (r *Repository) UpdateFeed(ctx context.Context, feedID string, update datab
 
 	return nil
 }
+
+// DeleteFeed deletes a feed from the database by ID and user ID
+// Returns error that can be checked with database.IsNotFoundError if feed doesn't exist or doesn't belong to user
+func (r *Repository) DeleteFeed(ctx context.Context, id, userID string) error {
+	var result []database.PublicFeedsSelect
+	_, err := r.db.From("feeds").
+		Delete("", "").
+		Eq("id", id).
+		Eq("user_id", userID).
+		ExecuteTo(&result)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete feed: %w", err)
+	}
+
+	// Check if any rows were affected
+	if len(result) == 0 {
+		return fmt.Errorf("feed not found")
+	}
+
+	return nil
+}

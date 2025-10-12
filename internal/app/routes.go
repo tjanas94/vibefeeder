@@ -34,6 +34,7 @@ func (a *App) setupRoutes() {
 	a.Echo.POST("/feeds", feedHandler.CreateFeed)
 	a.Echo.GET("/feeds/:id/edit", feedHandler.HandleFeedEditForm)
 	a.Echo.POST("/feeds/:id", feedHandler.HandleUpdate)
+	a.Echo.DELETE("/feeds/:id", feedHandler.DeleteFeed)
 
 	// Summary routes (authenticated with rate limiting)
 	aiClient := ai.NewOpenRouterClient(a.Config.OpenRouter.APIKey)
