@@ -86,6 +86,7 @@ func (r *Repository) InsertEvent(ctx context.Context, event database.PublicEvent
 
 // FindFeedByIDAndUser retrieves a single feed by ID and user ID
 // Returns error if feed is not found or doesn't belong to the user
+// Used for: edit form display, update operations
 func (r *Repository) FindFeedByIDAndUser(ctx context.Context, feedID, userID string) (*database.PublicFeedsSelect, error) {
 	var feeds []database.PublicFeedsSelect
 	_, err := r.db.From("feeds").
@@ -104,4 +105,41 @@ func (r *Repository) FindFeedByIDAndUser(ctx context.Context, feedID, userID str
 	}
 
 	return &feeds[0], nil
+}
+
+// IsURLTaken checks if a URL is already in use by another feed for the same user
+// excludeFeedID is used to exclude the current feed being updated from the check
+func (r *Repository) IsURLTaken(ctx context.Context, userID, url, excludeFeedID string) (bool, error) {
+	var feeds []database.PublicFeedsSelect
+	_, err := r.db.From("feeds").
+		Select("id", "", false).
+		Eq("user_id", userID).
+		Eq("url", url).
+		Neq("id", excludeFeedID).
+		ExecuteTo(&feeds)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to check if URL is taken: %w", err)
+	}
+
+	return len(feeds) > 0, nil
+}
+
+// UpdateFeed updates an existing feed in the database
+func (r *Repository) UpdateFeed(ctx context.Context, feedID string, update database.PublicFeedsUpdate) error {
+	var result []database.PublicFeedsSelect
+	_, err := r.db.From("feeds").
+		Update(update, "", "").
+		Eq("id", feedID).
+		ExecuteTo(&result)
+
+	if err != nil {
+		return fmt.Errorf("failed to update feed: %w", err)
+	}
+
+	if len(result) == 0 {
+		return fmt.Errorf("feed not found")
+	}
+
+	return nil
 }

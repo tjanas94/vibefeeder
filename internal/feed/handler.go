@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -181,6 +182,84 @@ func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 
 	// Success - render edit form with view model
 	return c.Render(http.StatusOK, "", view.FeedEditForm(*vm))
+}
+
+// HandleUpdate handles POST /feeds/:id endpoint
+// Updates an existing feed for the authenticated user
+func (h *Handler) HandleUpdate(c echo.Context) error {
+	// Get user ID from authenticated session
+	userID := auth.GetUserID(c)
+	if userID == "" {
+		h.logger.Error("missing user_id in context")
+		return h.renderUpdateFormError(c, "", http.StatusUnauthorized, models.FeedFormErrorViewModel{
+			GeneralError: "Authentication required",
+		})
+	}
+
+	// Get feed ID from path parameter
+	feedID := c.Param("id")
+
+	// Validate UUID format
+	if !validator.IsValidUUID(feedID) {
+		h.logger.Warn("invalid feed id format", "feed_id", feedID, "user_id", userID)
+		return h.renderUpdateFormError(c, feedID, http.StatusBadRequest, models.FeedFormErrorViewModel{
+			GeneralError: "Invalid feed ID",
+		})
+	}
+
+	// Bind form data to command
+	cmd := new(models.UpdateFeedCommand)
+	if err := c.Bind(cmd); err != nil {
+		h.logger.Warn("failed to bind form data", "feed_id", feedID, "error", err)
+		return h.renderUpdateFormError(c, feedID, http.StatusBadRequest, models.FeedFormErrorViewModel{
+			GeneralError: "Invalid form data",
+		})
+	}
+
+	// Validate command
+	if err := c.Validate(cmd); err != nil {
+		h.logger.Warn("validation failed", "feed_id", feedID, "error", err)
+		// Parse validation errors into view model
+		vm := parseValidationErrors(err)
+		return h.renderUpdateFormError(c, feedID, http.StatusBadRequest, vm)
+	}
+
+	// Call service to update feed
+	if err := h.service.UpdateFeed(c.Request().Context(), feedID, userID, *cmd); err != nil {
+		// Handle specific error types
+		if err == ErrFeedNotFound {
+			h.logger.Info("feed not found or unauthorized", "feed_id", feedID, "user_id", userID)
+			return h.renderUpdateFormError(c, feedID, http.StatusNotFound, models.FeedFormErrorViewModel{
+				GeneralError: "Feed not found",
+			})
+		}
+
+		if err == ErrFeedURLConflict {
+			h.logger.Info("duplicate feed URL attempt", "feed_id", feedID, "user_id", userID, "url", cmd.URL)
+			return h.renderUpdateFormError(c, feedID, http.StatusConflict, models.FeedFormErrorViewModel{
+				URLError: "You have already added this feed",
+			})
+		}
+
+		// Handle other errors
+		h.logger.Error("failed to update feed", "feed_id", feedID, "user_id", userID, "error", err)
+		return h.renderUpdateFormError(c, feedID, http.StatusInternalServerError, models.FeedFormErrorViewModel{
+			GeneralError: "Failed to update feed. Please try again.",
+		})
+	}
+
+	// Success - return 204 No Content with HX-Trigger header
+	c.Response().Header().Set("HX-Trigger", "refreshFeedList")
+	return c.NoContent(http.StatusNoContent)
+}
+
+// renderUpdateFormError renders the form error view for feed update
+func (h *Handler) renderUpdateFormError(c echo.Context, feedID string, statusCode int, vm models.FeedFormErrorViewModel) error {
+	// Set htmx headers for form error handling with dynamic feed ID
+	targetID := fmt.Sprintf("#feed-edit-form-errors-%s", feedID)
+	c.Response().Header().Set("HX-Retarget", targetID)
+	c.Response().Header().Set("HX-Reswap", "innerHTML")
+	return c.Render(statusCode, "", view.FeedFormErrors(vm))
 }
 
 // renderError renders the error view with appropriate error message

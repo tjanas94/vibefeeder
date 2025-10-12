@@ -16,6 +16,9 @@ var (
 
 	// ErrFeedNotFound indicates that the feed was not found or doesn't belong to the user
 	ErrFeedNotFound = errors.New("feed not found")
+
+	// ErrFeedURLConflict indicates that the new URL is already in use by another feed
+	ErrFeedURLConflict = errors.New("feed URL already in use")
 )
 
 // Service handles business logic for feeds
@@ -117,6 +120,48 @@ func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*m
 	// Map database model to view model
 	vm := models.NewFeedEditFormFromDB(*dbFeed)
 	return &vm, nil
+}
+
+// UpdateFeed updates an existing feed with validation and conflict detection
+func (s *Service) UpdateFeed(ctx context.Context, feedID, userID string, cmd models.UpdateFeedCommand) error {
+	// Get existing feed to verify ownership and check current state
+	existingFeed, err := s.repo.FindFeedByIDAndUser(ctx, feedID, userID)
+	if err != nil {
+		// Check if error indicates feed not found
+		if isNotFoundError(err) {
+			return ErrFeedNotFound
+		}
+		return fmt.Errorf("failed to get feed for update: %w", err)
+	}
+
+	// Check if URL has changed
+	urlChanged := existingFeed.Url != cmd.URL
+
+	if urlChanged {
+		// Check if new URL is already taken by another feed of the same user
+		isTaken, err := s.repo.IsURLTaken(ctx, userID, cmd.URL, feedID)
+		if err != nil {
+			return fmt.Errorf("failed to check URL availability: %w", err)
+		}
+
+		if isTaken {
+			return ErrFeedURLConflict
+		}
+
+		// Update with URL change - resets fetch-related fields
+		updateData := cmd.ToUpdateWithURLChange()
+		if err := s.repo.UpdateFeed(ctx, feedID, updateData); err != nil {
+			return fmt.Errorf("failed to update feed with URL change: %w", err)
+		}
+	} else {
+		// Update only the name - preserves all fetch-related fields
+		updateData := cmd.ToUpdate()
+		if err := s.repo.UpdateFeed(ctx, feedID, updateData); err != nil {
+			return fmt.Errorf("failed to update feed: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // buildFeedListViewModel is a pure function that transforms repository result to view model
