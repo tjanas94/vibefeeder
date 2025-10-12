@@ -3,7 +3,6 @@ package validator
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -31,6 +30,7 @@ func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.validator.Struct(i); err != nil {
 		// Type assert to validator.ValidationErrors
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			// Return structured error map for easy parsing
 			return echo.NewHTTPError(
 				http.StatusBadRequest,
 				formatValidationErrors(validationErrors),
@@ -41,49 +41,49 @@ func (cv *CustomValidator) Validate(i any) error {
 	return nil
 }
 
-// formatValidationErrors formats validation errors into a readable message
-func formatValidationErrors(errs validator.ValidationErrors) string {
-	var messages []string
+// formatValidationErrors formats validation errors into a map
+// Format: {"FieldName": "error message"}
+func formatValidationErrors(errs validator.ValidationErrors) map[string]string {
+	errorMap := make(map[string]string)
 	for _, err := range errs {
-		messages = append(messages, formatFieldError(err))
+		errorMap[err.Field()] = formatFieldError(err)
 	}
-	return strings.Join(messages, "; ")
+	return errorMap
 }
 
 // formatFieldError formats a single field error
 func formatFieldError(err validator.FieldError) string {
-	field := err.Field()
 	tag := err.Tag()
 	param := err.Param()
 
 	switch tag {
 	case "required":
-		return fmt.Sprintf("Field '%s' is required", field)
+		return "This field is required"
 	case "email":
-		return fmt.Sprintf("Field '%s' must be a valid email address", field)
+		return "Must be a valid email address"
 	case "url":
-		return fmt.Sprintf("Field '%s' must be a valid URL", field)
+		return "Must be a valid URL"
 	case "min":
-		return fmt.Sprintf("Field '%s' must be at least %s characters long", field, param)
+		return fmt.Sprintf("Must be at least %s characters long", param)
 	case "max":
-		return fmt.Sprintf("Field '%s' must be at most %s characters long", field, param)
+		return fmt.Sprintf("Must be at most %s characters long", param)
 	case "len":
-		return fmt.Sprintf("Field '%s' must be exactly %s characters long", field, param)
+		return fmt.Sprintf("Must be exactly %s characters long", param)
 	case "gte":
-		return fmt.Sprintf("Field '%s' must be greater than or equal to %s", field, param)
+		return fmt.Sprintf("Must be greater than or equal to %s", param)
 	case "lte":
-		return fmt.Sprintf("Field '%s' must be less than or equal to %s", field, param)
+		return fmt.Sprintf("Must be less than or equal to %s", param)
 	case "gt":
-		return fmt.Sprintf("Field '%s' must be greater than %s", field, param)
+		return fmt.Sprintf("Must be greater than %s", param)
 	case "lt":
-		return fmt.Sprintf("Field '%s' must be less than %s", field, param)
+		return fmt.Sprintf("Must be less than %s", param)
 	case "oneof":
-		return fmt.Sprintf("Field '%s' must be one of [%s]", field, param)
+		return fmt.Sprintf("Must be one of: %s", param)
 	case "uuid":
-		return fmt.Sprintf("Field '%s' must be a valid UUID", field)
+		return "Must be a valid UUID"
 	case "datetime":
-		return fmt.Sprintf("Field '%s' must be a valid datetime in format %s", field, param)
+		return fmt.Sprintf("Must be a valid datetime in format %s", param)
 	default:
-		return fmt.Sprintf("Field '%s' failed validation on tag '%s'", field, tag)
+		return fmt.Sprintf("Failed validation: %s", tag)
 	}
 }

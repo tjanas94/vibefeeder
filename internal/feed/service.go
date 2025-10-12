@@ -2,10 +2,17 @@ package feed
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+)
+
+var (
+	// ErrFeedAlreadyExists indicates that a feed with the same URL already exists for the user
+	ErrFeedAlreadyExists = errors.New("feed already exists for this user")
 )
 
 // Service handles business logic for feeds
@@ -31,6 +38,53 @@ func (s *Service) ListFeeds(ctx context.Context, query models.ListFeedsQuery) (*
 	// Build view model using pure function
 	viewModel := buildFeedListViewModel(result, query)
 	return &viewModel, nil
+}
+
+// CreateFeed creates a new feed for the authenticated user
+func (s *Service) CreateFeed(ctx context.Context, cmd models.CreateFeedCommand, userID string) error {
+	// Convert command to insert model
+	feedInsert := cmd.ToInsert(userID)
+
+	// Insert feed into database
+	if err := s.repo.InsertFeed(ctx, feedInsert); err != nil {
+		// Check if error is due to unique constraint violation (duplicate URL for user)
+		if isUniqueViolationError(err) {
+			return ErrFeedAlreadyExists
+		}
+		return fmt.Errorf("failed to create feed: %w", err)
+	}
+
+	// Log feed_added event
+	event := database.PublicEventsInsert{
+		EventType: "feed_added",
+		UserId:    &userID,
+		Metadata: map[string]interface{}{
+			"feed_name": cmd.Name,
+			"feed_url":  cmd.URL,
+		},
+	}
+
+	// Insert event (non-critical operation, just log if it fails)
+	if err := s.repo.InsertEvent(ctx, event); err != nil {
+		// Event logging failure should not prevent feed creation
+		// This is logged but not returned as error
+		return fmt.Errorf("feed created but event logging failed: %w", err)
+	}
+
+	return nil
+}
+
+// isUniqueViolationError checks if the error is due to unique constraint violation
+// PostgREST returns 409 status code wrapped in error message for unique violations
+func isUniqueViolationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := strings.ToLower(err.Error())
+	// PostgREST returns errors with "409" or "duplicate key" in the message
+	return strings.Contains(errMsg, "409") ||
+		strings.Contains(errMsg, "duplicate key") ||
+		strings.Contains(errMsg, "unique constraint")
 }
 
 // buildFeedListViewModel is a pure function that transforms repository result to view model

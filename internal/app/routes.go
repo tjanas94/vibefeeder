@@ -31,6 +31,7 @@ func (a *App) setupRoutes() {
 	feedService := feed.NewService(a.DB)
 	feedHandler := feed.NewHandler(feedService, a.Logger)
 	a.Echo.GET("/feeds", feedHandler.ListFeeds)
+	a.Echo.POST("/feeds", feedHandler.CreateFeed)
 
 	// Summary routes (authenticated with rate limiting)
 	aiClient := ai.NewOpenRouterClient(a.Config.OpenRouter.APIKey)

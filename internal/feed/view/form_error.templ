@@ -1,0 +1,15 @@
+package view
+
+import (
+	"fmt"
+	"github.com/tjanas94/vibefeeder/internal/feed/models"
+)
+
+// FeedFormErrors renders validation errors for feed forms (debug version)
+// Used by: POST /feeds, POST /feeds/{id}
+templ FeedFormErrors(vm models.FeedFormErrorViewModel) {
+	<div class="p-4">
+		<h1 class="text-2xl font-bold mb-4">internal/feed/view/form_error.templ</h1>
+		<pre>{ fmt.Sprintf("%+v", vm) }</pre>
+	</div>
+}

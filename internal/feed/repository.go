@@ -63,3 +63,23 @@ func (r *Repository) ListFeeds(ctx context.Context, query models.ListFeedsQuery)
 		TotalCount: int(count),
 	}, nil
 }
+
+// InsertFeed creates a new feed in the database
+func (r *Repository) InsertFeed(ctx context.Context, feed database.PublicFeedsInsert) error {
+	var result []database.PublicFeedsSelect
+	_, err := r.db.From("feeds").Insert(feed, false, "", "", "").ExecuteTo(&result)
+	if err != nil {
+		return fmt.Errorf("failed to insert feed: %w", err)
+	}
+	return nil
+}
+
+// InsertEvent creates a new event in the database
+func (r *Repository) InsertEvent(ctx context.Context, event database.PublicEventsInsert) error {
+	var result []database.PublicEventsSelect
+	_, err := r.db.From("events").Insert(event, false, "", "", "").ExecuteTo(&result)
+	if err != nil {
+		return fmt.Errorf("failed to insert event: %w", err)
+	}
+	return nil
+}
