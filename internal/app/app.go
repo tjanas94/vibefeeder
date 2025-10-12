@@ -8,7 +8,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/shared/config"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	"github.com/tjanas94/vibefeeder/internal/shared/errors"
 	"github.com/tjanas94/vibefeeder/internal/shared/logger"
+	"github.com/tjanas94/vibefeeder/internal/shared/validator"
 	"github.com/tjanas94/vibefeeder/internal/shared/view"
 )
 
@@ -54,6 +56,9 @@ func New() (*App, error) {
 	// Register Templ renderer
 	e.Renderer = view.NewTemplRenderer()
 
+	// Register validator
+	e.Validator = validator.New()
+
 	// Create app instance
 	app := &App{
 		Echo:   e,
@@ -63,7 +68,7 @@ func New() (*App, error) {
 	}
 
 	// Register custom error handler
-	e.HTTPErrorHandler = app.customErrorHandler
+	e.HTTPErrorHandler = errors.NewHTTPErrorHandler(log)
 
 	// Setup middleware
 	app.setupMiddleware()
