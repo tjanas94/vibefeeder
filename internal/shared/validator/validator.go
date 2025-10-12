@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -86,4 +87,12 @@ func formatFieldError(err validator.FieldError) string {
 	default:
 		return fmt.Sprintf("Failed validation: %s", tag)
 	}
+}
+
+// IsValidUUID checks if a string is a valid UUID format.
+// Returns true if valid, false otherwise.
+// Use this for validating path/query parameters that should be UUIDs.
+func IsValidUUID(s string) bool {
+	_, err := uuid.Parse(s)
+	return err == nil
 }

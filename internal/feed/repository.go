@@ -83,3 +83,25 @@ func (r *Repository) InsertEvent(ctx context.Context, event database.PublicEvent
 	}
 	return nil
 }
+
+// FindFeedByIDAndUser retrieves a single feed by ID and user ID
+// Returns error if feed is not found or doesn't belong to the user
+func (r *Repository) FindFeedByIDAndUser(ctx context.Context, feedID, userID string) (*database.PublicFeedsSelect, error) {
+	var feeds []database.PublicFeedsSelect
+	_, err := r.db.From("feeds").
+		Select("*", "", false).
+		Eq("id", feedID).
+		Eq("user_id", userID).
+		Single().
+		ExecuteTo(&feeds)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find feed: %w", err)
+	}
+
+	if len(feeds) == 0 {
+		return nil, fmt.Errorf("feed not found")
+	}
+
+	return &feeds[0], nil
+}

@@ -146,6 +146,43 @@ func (h *Handler) renderFormError(c echo.Context, statusCode int, vm models.Feed
 	return c.Render(statusCode, "", view.FeedFormErrors(vm))
 }
 
+// HandleFeedEditForm handles GET /feeds/:id/edit endpoint
+// Returns an HTML form pre-filled with the feed's current data for editing
+func (h *Handler) HandleFeedEditForm(c echo.Context) error {
+	// Get user ID from authenticated session (check auth first)
+	userID := auth.GetUserID(c)
+	if userID == "" {
+		h.logger.Error("missing user_id in context")
+		return h.renderError(c, http.StatusUnauthorized, "Authentication required")
+	}
+
+	// Get feed ID from path parameter
+	feedID := c.Param("id")
+
+	// Validate UUID format
+	if !validator.IsValidUUID(feedID) {
+		h.logger.Warn("invalid feed id format", "feed_id", feedID, "user_id", userID)
+		return h.renderError(c, http.StatusBadRequest, "Invalid feed ID")
+	}
+
+	// Call service to get feed for editing
+	vm, err := h.service.GetFeedForEdit(c.Request().Context(), feedID, userID)
+	if err != nil {
+		// Handle specific error types
+		if err == ErrFeedNotFound {
+			h.logger.Info("feed not found or unauthorized", "feed_id", feedID, "user_id", userID)
+			return h.renderError(c, http.StatusNotFound, "Feed not found")
+		}
+
+		// Handle other errors
+		h.logger.Error("failed to get feed for edit", "feed_id", feedID, "user_id", userID, "error", err)
+		return h.renderError(c, http.StatusInternalServerError, "Failed to load feed")
+	}
+
+	// Success - render edit form with view model
+	return c.Render(http.StatusOK, "", view.FeedEditForm(*vm))
+}
+
 // renderError renders the error view with appropriate error message
 func (h *Handler) renderError(c echo.Context, statusCode int, message string) error {
 	vm := models.FeedListErrorViewModel{

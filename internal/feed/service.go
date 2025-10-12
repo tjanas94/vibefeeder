@@ -13,6 +13,9 @@ import (
 var (
 	// ErrFeedAlreadyExists indicates that a feed with the same URL already exists for the user
 	ErrFeedAlreadyExists = errors.New("feed already exists for this user")
+
+	// ErrFeedNotFound indicates that the feed was not found or doesn't belong to the user
+	ErrFeedNotFound = errors.New("feed not found")
 )
 
 // Service handles business logic for feeds
@@ -85,6 +88,35 @@ func isUniqueViolationError(err error) bool {
 	return strings.Contains(errMsg, "409") ||
 		strings.Contains(errMsg, "duplicate key") ||
 		strings.Contains(errMsg, "unique constraint")
+}
+
+// isNotFoundError checks if the error indicates that a resource was not found
+// PostgREST returns 404 or "no rows" in error message when resource doesn't exist
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "not found") ||
+		strings.Contains(errMsg, "no rows") ||
+		strings.Contains(errMsg, "404")
+}
+
+// GetFeedForEdit retrieves a feed for editing
+func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*models.FeedEditFormViewModel, error) {
+	// Fetch feed from repository (includes authorization check via user_id)
+	dbFeed, err := s.repo.FindFeedByIDAndUser(ctx, feedID, userID)
+	if err != nil {
+		// Check if error indicates feed not found
+		if isNotFoundError(err) {
+			return nil, ErrFeedNotFound
+		}
+		return nil, fmt.Errorf("failed to get feed for edit: %w", err)
+	}
+
+	// Map database model to view model
+	vm := models.NewFeedEditFormFromDB(*dbFeed)
+	return &vm, nil
 }
 
 // buildFeedListViewModel is a pure function that transforms repository result to view model
