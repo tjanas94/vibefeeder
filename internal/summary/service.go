@@ -34,17 +34,7 @@ func NewService(db *database.Client, aiClient AIClient, logger *slog.Logger) *Se
 
 // GenerateSummary generates a new AI summary from user's articles from the last 24 hours
 func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.SummaryDisplayViewModel, error) {
-	// Step 1: Check if user has any feeds
-	hasFeeds, err := s.checkUserHasFeeds(ctx, userID)
-	if err != nil {
-		s.logger.Error("failed to check user feeds", "user_id", userID, "error", err)
-		return nil, fmt.Errorf("failed to check user feeds: %w", err)
-	}
-	if !hasFeeds {
-		return nil, ErrNoFeeds
-	}
-
-	// Step 2: Fetch articles from last 24 hours
+	// Step 1: Fetch articles from last 24 hours
 	articles, err := s.fetchRecentArticles(ctx, userID)
 	if err != nil {
 		s.logger.Error("failed to fetch articles", "user_id", userID, "error", err)
@@ -54,10 +44,10 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 		return nil, ErrNoArticlesFound
 	}
 
-	// Step 3: Prepare prompt from articles
+	// Step 2: Prepare prompt from articles
 	prompt := buildPromptFromArticles(articles)
 
-	// Step 4: Call AI service with timeout
+	// Step 3: Call AI service with timeout
 	aiCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -67,14 +57,14 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 		return nil, ErrAIServiceUnavailable
 	}
 
-	// Step 5: Save summary to database
+	// Step 4: Save summary to database
 	dbSummary, err := s.saveSummary(ctx, userID, summaryContent)
 	if err != nil {
 		s.logger.Error("failed to save summary to database", "user_id", userID, "error", err)
 		return nil, ErrDatabase
 	}
 
-	// Step 6: Record event
+	// Step 5: Record event
 	if err := s.recordSummaryEvent(ctx, userID); err != nil {
 		// Log error but don't fail the request
 		s.logger.Warn("failed to record summary event", "user_id", userID, "error", err)
@@ -87,22 +77,6 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 		ShowEmptyState: false,
 		CanGenerate:    true, // User just generated, so they have feeds
 	}, nil
-}
-
-// checkUserHasFeeds verifies if the user has at least one feed configured
-func (s *Service) checkUserHasFeeds(ctx context.Context, userID string) (bool, error) {
-	var feeds []database.PublicFeedsSelect
-	_, err := s.db.From("feeds").
-		Select("id", "", false).
-		Eq("user_id", userID).
-		Limit(1, "").
-		ExecuteTo(&feeds)
-
-	if err != nil {
-		return false, err
-	}
-
-	return len(feeds) > 0, nil
 }
 
 // fetchRecentArticles retrieves all articles published in the last 24 hours for the user's feeds
@@ -178,17 +152,16 @@ func (s *Service) GetLatestSummaryForUser(ctx context.Context, userID string) (*
 		return nil, fmt.Errorf("failed to fetch latest summary: %w", err)
 	}
 
-	// Step 2: Check if user has at least one working feed (last_fetch_status = 'success')
+	// Step 2: Check if user has at least one feed
 	var feeds []database.PublicFeedsSelect
 	_, err = s.db.From("feeds").
 		Select("id", "", false).
 		Eq("user_id", userID).
-		Eq("last_fetch_status", "success").
 		Limit(1, "").
 		ExecuteTo(&feeds)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to check working feeds: %w", err)
+		return nil, fmt.Errorf("failed to check user feeds: %w", err)
 	}
 
 	canGenerate := len(feeds) > 0

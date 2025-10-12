@@ -418,8 +418,6 @@ type SummaryErrorViewModel struct {
 
 **Error Responses:**
 
-- 400 Bad Request
-  - Renders: `SummaryErrorViewModel` with `ErrorMessage = "You must add at least one RSS feed before generating a summary"`
 - 404 Not Found
   - Renders: `SummaryErrorViewModel` with `ErrorMessage = "No articles found from the last 24 hours"`
 - 500 Internal Server Error
@@ -529,23 +527,20 @@ All endpoints except:
 
 **Business Rules:**
 
-- User must have at least one feed
 - Must have at least one article published in the last 24 hours
 - Summary generation timeout: 60 seconds
 - If AI API fails, retry once before returning error
 
 **Validation Process:**
 
-1. Check user has feeds: `SELECT COUNT(*) FROM feeds WHERE user_id = ?`
-2. If count = 0, return error "You must add at least one RSS feed before generating a summary"
-3. Query articles from last 24 hours across all user feeds
-4. If no articles found, return error "No articles found from the last 24 hours"
-5. Prepare articles for AI API (format: title, content, published date)
-6. Call OpenRouter AI API with timeout
-7. If timeout or error, retry once
-8. If still fails, return error "Failed to generate summary. Please try again later."
-9. Save summary to database
-10. Return rendered summary
+1. Query articles from last 24 hours across all user feeds
+2. If no articles found, return error "No articles found from the last 24 hours"
+3. Prepare articles for AI API (format: title, content, published date)
+4. Call OpenRouter AI API with timeout
+5. If timeout or error, retry once
+6. If still fails, return error "Failed to generate summary. Please try again later."
+7. Save summary to database
+8. Return rendered summary
 
 ### 4.2 Business Logic Implementation
 
@@ -622,14 +617,7 @@ All endpoints except:
 
 #### Summary Generation Flow
 
-1. Check user has working feeds:
-   ```sql
-   SELECT COUNT(*) FROM feeds
-   WHERE user_id = ?
-     AND last_fetch_status NOT IN ('permanent_error', 'unauthorized')
-   ```
-2. If count = 0, return 400 with error
-3. Query articles from last 24 hours:
+1. Query articles from last 24 hours:
    ```sql
    SELECT a.id, a.title, a.content, a.url, a.published_at, f.name AS feed_name
    FROM articles a
@@ -638,8 +626,8 @@ All endpoints except:
    ORDER BY a.published_at DESC
    LIMIT 100
    ```
-4. If no articles, return 404 with error "No articles found from the last 24 hours"
-5. Prepare prompt for AI:
+2. If no articles, return 404 with error "No articles found from the last 24 hours"
+3. Prepare prompt for AI:
 
    ```
    Generate a concise summary of the following articles published in the last 24 hours.
@@ -649,16 +637,16 @@ All endpoints except:
    [for each article: Title, Source, Published Date, Content excerpt]
    ```
 
-6. Call OpenRouter API:
+4. Call OpenRouter API:
    - Model: configurable (default: `openai/gpt-4o-mini` for cost efficiency)
    - Max tokens: 1000
    - Temperature: 0.3 (for consistency)
    - Timeout: 60 seconds
-7. If API call fails, retry once after 2-second delay
-8. If still fails, return 503 with error
-9. Save summary: `INSERT INTO summaries (user_id, content) VALUES (?, ?)`
-10. Record event: `INSERT INTO events (user_id, event_type, metadata) VALUES (?, 'summary_generated', '{"article_count": N}')`
-11. Return summary display HTML partial with new summary
+5. If API call fails, retry once after 2-second delay
+6. If still fails, return 503 with error
+7. Save summary: `INSERT INTO summaries (user_id, content) VALUES (?, ?)`
+8. Record event: `INSERT INTO events (user_id, event_type, metadata) VALUES (?, 'summary_generated', '{"article_count": N}')`
+9. Return summary display HTML partial with new summary
 
 #### Article Fetch Background Job
 

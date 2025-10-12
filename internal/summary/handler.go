@@ -50,10 +50,6 @@ func (h *Handler) GenerateSummary(c echo.Context) error {
 // handleServiceError maps service errors to appropriate HTTP responses
 func (h *Handler) handleServiceError(c echo.Context, err error) error {
 	switch {
-	case errors.Is(err, ErrNoFeeds):
-		h.logger.Info("user has no feeds", "error", err)
-		return h.renderError(c, http.StatusBadRequest, err.Error())
-
 	case errors.Is(err, ErrNoArticlesFound):
 		h.logger.Info("no articles found for user", "error", err)
 		return h.renderError(c, http.StatusNotFound, err.Error())

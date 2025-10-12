@@ -42,19 +42,18 @@ Celem tego punktu końcowego jest generowanie nowego podsumowania przy użyciu A
 3.  `SummaryHandler` odbiera żądanie.
 4.  Handler wywołuje `SummaryService.GenerateSummary(ctx)`.
 5.  `SummaryService`:
-    a. Sprawdza, czy użytkownik ma jakiekolwiek feedy w tabeli `feeds`. Jeśli nie, zwraca błąd `ErrNoFeeds`.
-    b. Pobiera wszystkie artykuły dla danego `user_id` z tabeli `articles`, gdzie `published_at` jest w ciągu ostatnich 24 godzin.
-    c. Jeśli nie ma artykułów, zwraca błąd `ErrNoArticlesFound`.
-    d. Konkatenuje tytuły i treść artykułów, tworząc pojedynczy tekst (prompt) dla modelu AI.
-    e. Wywołuje klienta OpenRouter.ai z przygotowanym promptem.
-    f. W przypadku błędu z API AI, zwraca błąd `ErrAIServiceUnavailable`.
-    g. Po otrzymaniu odpowiedzi, zapisuje nowe podsumowanie w tabeli `summaries` z `user_id` i treścią.
-    h. W przypadku błędu zapisu do bazy, zwraca błąd `ErrDatabase`.
-    i. Zapisuje zdarzenie `summary_generated` z `user_id` w tabeli `events`.
-    j. Zwraca nowo utworzony model podsumowania do handlera.
+    a. Pobiera wszystkie artykuły dla danego `user_id` z tabeli `articles`, gdzie `published_at` jest w ciągu ostatnich 24 godzin.
+    b. Jeśli nie ma artykułów, zwraca błąd `ErrNoArticlesFound`.
+    c. Konkatenuje tytuły i treść artykułów, tworząc pojedynczy tekst (prompt) dla modelu AI.
+    d. Wywołuje klienta OpenRouter.ai z przygotowanym promptem.
+    e. W przypadku błędu z API AI, zwraca błąd `ErrAIServiceUnavailable`.
+    f. Po otrzymaniu odpowiedzi, zapisuje nowe podsumowanie w tabeli `summaries` z `user_id` i treścią.
+    g. W przypadku błędu zapisu do bazy, zwraca błąd `ErrDatabase`.
+    h. Zapisuje zdarzenie `summary_generated` z `user_id` w tabeli `events`.
+    i. Zwraca nowo utworzony model podsumowania do handlera.
 6.  `SummaryHandler`:
     a. W przypadku sukcesu, renderuje widok `display.templ` z danymi podsumowania i zwraca odpowiedź `200 OK`.
-    b. W przypadku błędów biznesowych (`ErrNoFeeds`, `ErrNoArticlesFound`), renderuje `error.templ` z odpowiednim komunikatem i statusem (`400` lub `404`).
+    b. W przypadku błędu `ErrNoArticlesFound`, renderuje `error.templ` z odpowiednim komunikatem i statusem `404`.
     c. W przypadku błędów systemowych (`ErrAIServiceUnavailable`, `ErrDatabase`), loguje błąd i renderuje `error.templ` z generycznym komunikatem i statusem (`503` lub `500`).
 
 ## 6. Względy bezpieczeństwa
@@ -68,7 +67,6 @@ Celem tego punktu końcowego jest generowanie nowego podsumowania przy użyciu A
 
 Zdefiniowane zostaną dedykowane typy błędów w pakiecie `summary`, aby umożliwić handlerowi mapowanie ich na odpowiednie kody statusu HTTP.
 
-- `ErrNoFeeds` (400): "You must add at least one RSS feed before generating a summary"
 - `ErrNoArticlesFound` (404): "No articles found from the last 24 hours"
 - `ErrAIServiceUnavailable` (503): "AI service is temporarily unavailable"
 - `ErrDatabase` (500): "Failed to generate summary. Please try again later."
@@ -85,10 +83,10 @@ Zdefiniowane zostaną dedykowane typy błędów w pakiecie `summary`, aby umożl
     - Utwórz pliki: `internal/summary/handler.go`, `internal/summary/service.go`, `internal/summary/errors.go`.
     - Utwórz pliki widoków: `internal/summary/view/display.templ`, `internal/summary/view/error.templ`.
 2.  **Routing**: W `internal/app/routes.go`, dodaj nową trasę `POST /summaries` w grupie wymagającej autoryzacji, kierując ją do `summaryHandler.GenerateSummary`.
-3.  **Błędy**: W `internal/summary/errors.go`, zdefiniuj niestandardowe typy błędów (`ErrNoFeeds`, `ErrNoArticlesFound`, etc.).
+3.  **Błędy**: W `internal/summary/errors.go`, zdefiniuj niestandardowe typy błędów (`ErrNoArticlesFound`, etc.).
 4.  **Warstwa serwisu (`SummaryService`)**:
     - Zaimplementuj metodę `GenerateSummary(ctx context.Context) (*database.PublicSummariesSelect, error)`.
-    - Dodaj logikę sprawdzania feedów i artykułów, zwracając odpowiednie błędy.
+    - Dodaj logikę sprawdzania artykułów, zwracając odpowiednie błędy.
     - Zaimplementuj klienta dla OpenRouter.ai w nowym pakiecie (np. `internal/shared/ai/openrouter.go`). Na tym etapie skorzystamy z mocków zamiast rzeczywistego wywołania API.
     - Dodaj logikę wywołania API AI z obsługą timeoutów i błędów.
     - Zaimplementuj logikę zapisu do tabel `summaries` i `events` przy użyciu klienta Supabase.
