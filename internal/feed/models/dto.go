@@ -53,6 +53,12 @@ type FeedFormErrorViewModel struct {
 	GeneralError string `json:"general_error,omitempty"`
 }
 
+// FeedListErrorViewModel represents errors during feed list retrieval.
+// Used by: GET /feeds
+type FeedListErrorViewModel struct {
+	ErrorMessage string `json:"error_message"`
+}
+
 // NewFeedItemFromDB creates a FeedItemViewModel from database.PublicFeedsSelect.
 // Computes HasError from LastFetchError and parses timestamps.
 func NewFeedItemFromDB(dbFeed database.PublicFeedsSelect) FeedItemViewModel {

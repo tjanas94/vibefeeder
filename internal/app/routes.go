@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/tjanas94/vibefeeder/internal/dashboard"
+	"github.com/tjanas94/vibefeeder/internal/feed"
 	"github.com/tjanas94/vibefeeder/internal/shared/ai"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
 	"github.com/tjanas94/vibefeeder/internal/summary"
@@ -25,6 +26,11 @@ func (a *App) setupRoutes() {
 	// Dashboard routes (authenticated)
 	dashboardHandler := dashboard.NewHandler(a.Logger)
 	a.Echo.GET("/dashboard", dashboardHandler.ShowDashboard)
+
+	// Feed routes (authenticated)
+	feedService := feed.NewService(a.DB)
+	feedHandler := feed.NewHandler(feedService, a.Logger)
+	a.Echo.GET("/feeds", feedHandler.ListFeeds)
 
 	// Summary routes (authenticated with rate limiting)
 	aiClient := ai.NewOpenRouterClient(a.Config.OpenRouter.APIKey)
