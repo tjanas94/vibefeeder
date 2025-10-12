@@ -4,24 +4,15 @@ import (
 	"time"
 
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	sharedmodels "github.com/tjanas94/vibefeeder/internal/shared/models"
 )
 
 // FeedListViewModel represents the feed list display with empty state support.
 // Used by: GET /feeds
 type FeedListViewModel struct {
-	Feeds          []FeedItemViewModel `json:"feeds"`
-	ShowEmptyState bool                `json:"show_empty_state"`
-	Pagination     PaginationViewModel `json:"pagination"`
-}
-
-// PaginationViewModel represents pagination information for feed list.
-// Used by: GET /feeds
-type PaginationViewModel struct {
-	CurrentPage int  `json:"current_page"`
-	TotalPages  int  `json:"total_pages"`
-	TotalItems  int  `json:"total_items"`
-	HasPrevious bool `json:"has_previous"`
-	HasNext     bool `json:"has_next"`
+	Feeds          []FeedItemViewModel              `json:"feeds"`
+	ShowEmptyState bool                             `json:"show_empty_state"`
+	Pagination     sharedmodels.PaginationViewModel `json:"pagination"`
 }
 
 // FeedItemViewModel represents a single feed item for display.
@@ -91,4 +82,26 @@ func NewFeedEditFormFromDB(dbFeed database.PublicFeedsSelect) FeedEditFormViewMo
 		Name:   dbFeed.Name,
 		URL:    dbFeed.Url,
 	}
+}
+
+// NewFeedFormErrorFromFieldErrors creates FeedFormErrorViewModel from field error map.
+// Accepts a map of field names to error messages (from validator.ParseFieldErrors).
+// Returns a view model with errors mapped to the appropriate fields.
+func NewFeedFormErrorFromFieldErrors(fieldErrors map[string]string) FeedFormErrorViewModel {
+	vm := FeedFormErrorViewModel{}
+
+	if fieldErrors == nil {
+		vm.GeneralError = "Invalid request"
+		return vm
+	}
+
+	// Map parsed errors to view model fields
+	if nameErr, ok := fieldErrors["Name"]; ok {
+		vm.NameError = nameErr
+	}
+	if urlErr, ok := fieldErrors["URL"]; ok {
+		vm.URLError = urlErr
+	}
+
+	return vm
 }

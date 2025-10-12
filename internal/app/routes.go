@@ -28,7 +28,7 @@ func (a *App) setupRoutes() {
 	a.Echo.GET("/dashboard", dashboardHandler.ShowDashboard)
 
 	// Feed routes (authenticated)
-	feedService := feed.NewService(a.DB)
+	feedService := feed.NewService(a.DB, a.Logger)
 	feedHandler := feed.NewHandler(feedService, a.Logger)
 	a.Echo.GET("/feeds", feedHandler.ListFeeds)
 	a.Echo.POST("/feeds", feedHandler.CreateFeed)

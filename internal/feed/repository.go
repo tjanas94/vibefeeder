@@ -88,23 +88,19 @@ func (r *Repository) InsertEvent(ctx context.Context, event database.PublicEvent
 // Returns error if feed is not found or doesn't belong to the user
 // Used for: edit form display, update operations
 func (r *Repository) FindFeedByIDAndUser(ctx context.Context, feedID, userID string) (*database.PublicFeedsSelect, error) {
-	var feeds []database.PublicFeedsSelect
+	var feed database.PublicFeedsSelect
 	_, err := r.db.From("feeds").
 		Select("*", "", false).
 		Eq("id", feedID).
 		Eq("user_id", userID).
 		Single().
-		ExecuteTo(&feeds)
+		ExecuteTo(&feed)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find feed: %w", err)
 	}
 
-	if len(feeds) == 0 {
-		return nil, fmt.Errorf("feed not found")
-	}
-
-	return &feeds[0], nil
+	return &feed, nil
 }
 
 // IsURLTaken checks if a URL is already in use by another feed for the same user

@@ -91,7 +91,8 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 	if err := c.Validate(cmd); err != nil {
 		h.logger.Warn("validation failed", "error", err)
 		// Parse validation errors into view model
-		vm := parseValidationErrors(err)
+		fieldErrors := validator.ParseFieldErrors(err)
+		vm := models.NewFeedFormErrorFromFieldErrors(fieldErrors)
 		return h.renderFormError(c, http.StatusBadRequest, vm)
 	}
 
@@ -117,36 +118,6 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// parseValidationErrors converts validation errors to FeedFormErrorViewModel
-func parseValidationErrors(err error) models.FeedFormErrorViewModel {
-	vm := models.FeedFormErrorViewModel{}
-
-	// Parse field errors using shared validator package
-	fieldErrors := validator.ParseFieldErrors(err)
-	if fieldErrors == nil {
-		vm.GeneralError = "Invalid request"
-		return vm
-	}
-
-	// Map parsed errors to view model fields
-	if nameErr, ok := fieldErrors["Name"]; ok {
-		vm.NameError = nameErr
-	}
-	if urlErr, ok := fieldErrors["URL"]; ok {
-		vm.URLError = urlErr
-	}
-
-	return vm
-}
-
-// renderFormError renders the form error view
-func (h *Handler) renderFormError(c echo.Context, statusCode int, vm models.FeedFormErrorViewModel) error {
-	// Set htmx headers for form error handling
-	c.Response().Header().Set("HX-Retarget", "#feed-add-form-errors")
-	c.Response().Header().Set("HX-Reswap", "innerHTML")
-	return c.Render(statusCode, "", view.FeedFormErrors(vm))
-}
-
 // HandleFeedEditForm handles GET /feeds/:id/edit endpoint
 // Returns an HTML form pre-filled with the feed's current data for editing
 func (h *Handler) HandleFeedEditForm(c echo.Context) error {
@@ -157,12 +128,9 @@ func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 		return h.renderError(c, http.StatusUnauthorized, "Authentication required")
 	}
 
-	// Get feed ID from path parameter
-	feedID := c.Param("id")
-
-	// Validate UUID format
-	if !validator.IsValidUUID(feedID) {
-		h.logger.Warn("invalid feed id format", "feed_id", feedID, "user_id", userID)
+	// Get and validate feed ID from path parameter
+	feedID, err := h.getFeedID(c)
+	if err != nil {
 		return h.renderError(c, http.StatusBadRequest, "Invalid feed ID")
 	}
 
@@ -196,13 +164,10 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 		})
 	}
 
-	// Get feed ID from path parameter
-	feedID := c.Param("id")
-
-	// Validate UUID format
-	if !validator.IsValidUUID(feedID) {
-		h.logger.Warn("invalid feed id format", "feed_id", feedID, "user_id", userID)
-		return h.renderUpdateFormError(c, feedID, http.StatusBadRequest, models.FeedFormErrorViewModel{
+	// Get and validate feed ID from path parameter
+	feedID, err := h.getFeedID(c)
+	if err != nil {
+		return h.renderUpdateFormError(c, "", http.StatusBadRequest, models.FeedFormErrorViewModel{
 			GeneralError: "Invalid feed ID",
 		})
 	}
@@ -220,7 +185,8 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 	if err := c.Validate(cmd); err != nil {
 		h.logger.Warn("validation failed", "feed_id", feedID, "error", err)
 		// Parse validation errors into view model
-		vm := parseValidationErrors(err)
+		fieldErrors := validator.ParseFieldErrors(err)
+		vm := models.NewFeedFormErrorFromFieldErrors(fieldErrors)
 		return h.renderUpdateFormError(c, feedID, http.StatusBadRequest, vm)
 	}
 
@@ -251,6 +217,24 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 	// Success - return 204 No Content with HX-Trigger header
 	c.Response().Header().Set("HX-Trigger", "refreshFeedList")
 	return c.NoContent(http.StatusNoContent)
+}
+
+// getFeedID extracts and validates feed ID from path parameter
+func (h *Handler) getFeedID(c echo.Context) (string, error) {
+	feedID := c.Param("id")
+	if !validator.IsValidUUID(feedID) {
+		h.logger.Warn("invalid feed id format", "feed_id", feedID)
+		return "", echo.NewHTTPError(http.StatusBadRequest, "Invalid feed ID")
+	}
+	return feedID, nil
+}
+
+// renderFormError renders the form error view
+func (h *Handler) renderFormError(c echo.Context, statusCode int, vm models.FeedFormErrorViewModel) error {
+	// Set htmx headers for form error handling
+	c.Response().Header().Set("HX-Retarget", "#feed-add-form-errors")
+	c.Response().Header().Set("HX-Reswap", "innerHTML")
+	return c.Render(statusCode, "", view.FeedFormErrors(vm))
 }
 
 // renderUpdateFormError renders the form error view for feed update

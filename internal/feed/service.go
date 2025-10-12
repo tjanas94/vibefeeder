@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
+	"log/slog"
 
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	sharedmodels "github.com/tjanas94/vibefeeder/internal/shared/models"
 )
 
 var (
@@ -23,13 +24,15 @@ var (
 
 // Service handles business logic for feeds
 type Service struct {
-	repo *Repository
+	repo   *Repository
+	logger *slog.Logger
 }
 
 // NewService creates a new feed service
-func NewService(db *database.Client) *Service {
+func NewService(db *database.Client, logger *slog.Logger) *Service {
 	return &Service{
-		repo: NewRepository(db),
+		repo:   NewRepository(db),
+		logger: logger,
 	}
 }
 
@@ -54,55 +57,32 @@ func (s *Service) CreateFeed(ctx context.Context, cmd models.CreateFeedCommand, 
 	// Insert feed into database
 	if err := s.repo.InsertFeed(ctx, feedInsert); err != nil {
 		// Check if error is due to unique constraint violation (duplicate URL for user)
-		if isUniqueViolationError(err) {
+		if database.IsUniqueViolationError(err) {
 			return ErrFeedAlreadyExists
 		}
 		return fmt.Errorf("failed to create feed: %w", err)
 	}
 
-	// Log feed_added event
-	event := database.PublicEventsInsert{
-		EventType: "feed_added",
-		UserId:    &userID,
-		Metadata: map[string]interface{}{
-			"feed_name": cmd.Name,
-			"feed_url":  cmd.URL,
-		},
-	}
-
-	// Insert event (non-critical operation, just log if it fails)
-	if err := s.repo.InsertEvent(ctx, event); err != nil {
-		// Event logging failure should not prevent feed creation
-		// This is logged but not returned as error
-		return fmt.Errorf("feed created but event logging failed: %w", err)
-	}
+	// Log feed_added event (non-critical, ignores errors)
+	s.logFeedAddedEvent(ctx, userID, cmd.Name, cmd.URL)
 
 	return nil
 }
 
-// isUniqueViolationError checks if the error is due to unique constraint violation
-// PostgREST returns 409 status code wrapped in error message for unique violations
-func isUniqueViolationError(err error) bool {
-	if err == nil {
-		return false
+// logFeedAddedEvent logs feed_added event (non-critical operation, ignores errors)
+func (s *Service) logFeedAddedEvent(ctx context.Context, userID, feedName, feedURL string) {
+	event := database.PublicEventsInsert{
+		EventType: "feed_added",
+		UserId:    &userID,
+		Metadata: map[string]interface{}{
+			"feed_name": feedName,
+			"feed_url":  feedURL,
+		},
 	}
-	errMsg := strings.ToLower(err.Error())
-	// PostgREST returns errors with "409" or "duplicate key" in the message
-	return strings.Contains(errMsg, "409") ||
-		strings.Contains(errMsg, "duplicate key") ||
-		strings.Contains(errMsg, "unique constraint")
-}
 
-// isNotFoundError checks if the error indicates that a resource was not found
-// PostgREST returns 404 or "no rows" in error message when resource doesn't exist
-func isNotFoundError(err error) bool {
-	if err == nil {
-		return false
+	if err := s.repo.InsertEvent(ctx, event); err != nil {
+		s.logger.Warn("failed to log feed_added event", "user_id", userID, "error", err)
 	}
-	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "not found") ||
-		strings.Contains(errMsg, "no rows") ||
-		strings.Contains(errMsg, "404")
 }
 
 // GetFeedForEdit retrieves a feed for editing
@@ -111,7 +91,7 @@ func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*m
 	dbFeed, err := s.repo.FindFeedByIDAndUser(ctx, feedID, userID)
 	if err != nil {
 		// Check if error indicates feed not found
-		if isNotFoundError(err) {
+		if database.IsNotFoundError(err) {
 			return nil, ErrFeedNotFound
 		}
 		return nil, fmt.Errorf("failed to get feed for edit: %w", err)
@@ -124,41 +104,45 @@ func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*m
 
 // UpdateFeed updates an existing feed with validation and conflict detection
 func (s *Service) UpdateFeed(ctx context.Context, feedID, userID string, cmd models.UpdateFeedCommand) error {
-	// Get existing feed to verify ownership and check current state
+	// Get existing feed to verify ownership
 	existingFeed, err := s.repo.FindFeedByIDAndUser(ctx, feedID, userID)
 	if err != nil {
-		// Check if error indicates feed not found
-		if isNotFoundError(err) {
+		if database.IsNotFoundError(err) {
 			return ErrFeedNotFound
 		}
 		return fmt.Errorf("failed to get feed for update: %w", err)
 	}
 
-	// Check if URL has changed
-	urlChanged := existingFeed.Url != cmd.URL
-
-	if urlChanged {
-		// Check if new URL is already taken by another feed of the same user
-		isTaken, err := s.repo.IsURLTaken(ctx, userID, cmd.URL, feedID)
-		if err != nil {
-			return fmt.Errorf("failed to check URL availability: %w", err)
-		}
-
-		if isTaken {
-			return ErrFeedURLConflict
-		}
-
-		// Update with URL change - resets fetch-related fields
-		updateData := cmd.ToUpdateWithURLChange()
-		if err := s.repo.UpdateFeed(ctx, feedID, updateData); err != nil {
-			return fmt.Errorf("failed to update feed with URL change: %w", err)
-		}
+	// Prepare update data based on whether URL changed
+	var updateData database.PublicFeedsUpdate
+	if existingFeed.Url == cmd.URL {
+		// Name-only update - preserves fetch-related fields
+		updateData = cmd.ToUpdate()
 	} else {
-		// Update only the name - preserves all fetch-related fields
-		updateData := cmd.ToUpdate()
-		if err := s.repo.UpdateFeed(ctx, feedID, updateData); err != nil {
-			return fmt.Errorf("failed to update feed: %w", err)
+		// URL changed - validate and reset fetch-related fields
+		if err := s.validateURLChange(ctx, userID, feedID, cmd.URL); err != nil {
+			return err
 		}
+		updateData = cmd.ToUpdateWithURLChange()
+	}
+
+	// Perform update
+	if err := s.repo.UpdateFeed(ctx, feedID, updateData); err != nil {
+		return fmt.Errorf("failed to update feed: %w", err)
+	}
+
+	return nil
+}
+
+// validateURLChange checks if new URL can be used
+func (s *Service) validateURLChange(ctx context.Context, userID, feedID, newURL string) error {
+	isTaken, err := s.repo.IsURLTaken(ctx, userID, newURL, feedID)
+	if err != nil {
+		return fmt.Errorf("failed to check URL availability: %w", err)
+	}
+
+	if isTaken {
+		return ErrFeedURLConflict
 	}
 
 	return nil
@@ -166,33 +150,18 @@ func (s *Service) UpdateFeed(ctx context.Context, feedID, userID string, cmd mod
 
 // buildFeedListViewModel is a pure function that transforms repository result to view model
 func buildFeedListViewModel(result *ListFeedsResult, query models.ListFeedsQuery) models.FeedListViewModel {
-	// Calculate pagination data
-	totalPages := (result.TotalCount + query.Limit - 1) / query.Limit
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
-	pagination := models.PaginationViewModel{
-		CurrentPage: query.Page,
-		TotalPages:  totalPages,
-		TotalItems:  result.TotalCount,
-		HasPrevious: query.Page > 1,
-		HasNext:     query.Page < totalPages,
-	}
-
 	// Transform database models to view models
 	feedItems := make([]models.FeedItemViewModel, len(result.Feeds))
 	for i, dbFeed := range result.Feeds {
 		feedItems[i] = models.NewFeedItemFromDB(dbFeed)
 	}
 
-	// Determine if empty state should be shown
 	// Show empty state only when there are no feeds at all (no filters applied)
 	showEmptyState := result.TotalCount == 0 && query.Search == "" && query.Status == "all"
 
 	return models.FeedListViewModel{
 		Feeds:          feedItems,
 		ShowEmptyState: showEmptyState,
-		Pagination:     pagination,
+		Pagination:     sharedmodels.BuildPagination(result.TotalCount, query.Page, query.Limit),
 	}
 }
