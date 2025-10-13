@@ -1,0 +1,32 @@
+package components
+
+// Navbar renders the top navigation bar for authenticated users.
+// This component accepts custom navigation items via children slot.
+//
+// Usage:
+//   @components.Navbar(components.NavbarProps{
+//       UserEmail: "user@example.com",
+//   }) {
+//       <button class="btn btn-ghost" @click="...">Custom Button</button>
+//   }
+templ Navbar(props NavbarProps) {
+	<div class="navbar bg-base-200 shadow-lg">
+		<div class="navbar-start gap-2">
+			<a href="/dashboard" class="btn btn-ghost text-xl font-bold">VibeFeeder</a>
+			{ children... }
+		</div>
+		<div class="navbar-center">
+			<!-- Reserved for future navigation items -->
+		</div>
+		<div class="navbar-end gap-2">
+			<div class="text-sm font-medium">{ props.UserEmail }</div>
+			<button
+				class="btn btn-ghost btn-sm"
+				hx-post="/auth/logout"
+				hx-trigger="click"
+			>
+				Wyloguj
+			</button>
+		</div>
+	</div>
+}

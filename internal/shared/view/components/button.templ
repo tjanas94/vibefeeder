@@ -1,0 +1,81 @@
+package components
+
+// TODO: Implement Button component
+//
+// Button should render a DaisyUI button with consistent styling and htmx integration.
+// Provides reusable button component with various variants and sizes.
+//
+// Use cases:
+// 1. Primary action buttons (Save, Submit, Add)
+// 2. Secondary actions (Cancel, Close)
+// 3. Danger actions (Delete, Remove)
+// 4. Icon buttons (X close button)
+//
+// Features:
+// - Multiple variants (primary, ghost, outline, link, error)
+// - Size options (xs, sm, md, lg)
+// - Icon support (prefix or suffix)
+// - Loading state
+// - Disabled state
+// - htmx attributes support
+// - Alpine.js event handlers
+//
+// Proposed structure:
+//
+// type ButtonProps struct {
+//     Text     string
+//     Variant  string  // "primary", "secondary", "ghost", "outline", "link", "error"
+//     Size     string  // "xs", "sm", "md", "lg"
+//     Icon     string  // optional icon (emoji or svg)
+//     IconPos  string  // "left", "right"
+//     Type     string  // "button", "submit", "reset" (default: "button")
+//     Disabled bool
+//     Loading  bool
+//
+//     // htmx attributes
+//     HxGet    string
+//     HxPost   string
+//     HxDelete string
+//     HxTarget string
+//     HxSwap   string
+//     HxTrigger string
+//
+//     // Alpine.js
+//     XClick   string
+// }
+//
+// Example usage - Primary button:
+// @components.Button(components.ButtonProps{
+//     Text: "Save Feed",
+//     Variant: "primary",
+//     Size: "md",
+//     Type: "submit",
+// })
+//
+// Example usage - Delete button with htmx:
+// @components.Button(components.ButtonProps{
+//     Text: "Delete",
+//     Variant: "error",
+//     Size: "sm",
+//     HxDelete: "/feeds/123",
+//     HxConfirm: "Are you sure?",
+// })
+//
+// Example usage - Close button with Alpine:
+// @components.Button(components.ButtonProps{
+//     Icon: "✕",
+//     Variant: "ghost",
+//     Size: "sm",
+//     XClick: "isModalOpen = false",
+// })
+//
+// Renders:
+// <button class="btn btn-primary btn-md" type="button">Save Feed</button>
+// <button class="btn btn-error btn-sm" hx-delete="/feeds/123">Delete</button>
+// <button class="btn btn-ghost btn-sm" @click="isModalOpen = false">✕</button>
+
+// Button is a placeholder component. Implementation pending.
+// TODO: Implement full Button component based on comments above.
+templ Button() {
+	<button class="btn">Button - to be implemented</button>
+}

@@ -1,0 +1,46 @@
+package components
+
+// TODO: Implement Tooltip component
+//
+// Tooltip should wrap content and show helpful text on hover/focus.
+// Based on DaisyUI tooltip component.
+//
+// Use cases:
+// 1. Error details on feed status icon
+//    - Position: "top"
+//    - Text: "Failed to fetch: Connection timeout"
+//
+// 2. Disabled button explanation
+//    - Position: "bottom"
+//    - Text: "Add at least one feed first"
+//
+// 3. Additional context for icons/actions
+//    - Position: "left" or "right"
+//
+// Proposed structure:
+//
+// type TooltipProps struct {
+//     Text     string
+//     Position string  // "top", "bottom", "left", "right" (default: "top")
+// }
+//
+// Example usage:
+// @components.Tooltip(components.TooltipProps{
+//     Text: "Failed to fetch: Connection timeout",
+//     Position: "top",
+// }) {
+//     <button class="btn btn-circle btn-sm">❌</button>
+// }
+//
+// Renders:
+// <div class="tooltip tooltip-top" data-tip="Failed to fetch: Connection timeout">
+//     <button class="btn btn-circle btn-sm">❌</button>
+// </div>
+
+// Tooltip is a placeholder component. Implementation pending.
+// TODO: Implement full Tooltip component based on comments above.
+templ Tooltip() {
+	<div class="tooltip" data-tip="Tooltip - to be implemented">
+		{ children... }
+	</div>
+}

@@ -1,0 +1,85 @@
+package components
+
+// TODO: Implement Card component
+//
+// Card should render a DaisyUI card with title, content, and optional actions.
+// Provides consistent styling for content blocks across the application.
+//
+// Use cases:
+// 1. Feed item in list
+//    - Title: Feed name
+//    - Subtitle: Feed URL
+//    - Badge: Status indicator
+//    - Actions: Edit, Delete buttons
+//    - Meta: Last updated timestamp
+//
+// 2. Summary card
+//    - Title: "Daily Summary"
+//    - Content: Summary text
+//    - Meta: Generated timestamp
+//
+// 3. Dashboard widgets (future)
+//
+// Features:
+// - Flexible content slot
+// - Optional image/icon
+// - Badge/status indicators
+// - Action buttons in footer
+// - Responsive design
+//
+// Proposed structure:
+//
+// type CardProps struct {
+//     Title       string
+//     Subtitle    string
+//     Image       string           // optional image URL or emoji
+//     Badge       string           // optional badge text
+//     BadgeType   string           // "success", "error", "warning", "info"
+//     Meta        string           // optional metadata (e.g., timestamp)
+// }
+//
+// Example usage - Feed Card:
+// @components.Card(components.CardProps{
+//     Title: "TechCrunch",
+//     Subtitle: "https://techcrunch.com/feed",
+//     Image: "📰",
+//     Badge: "Working",
+//     BadgeType: "success",
+//     Meta: "Updated 2 hours ago",
+// }) {
+//     <div class="card-actions justify-end">
+//         <button class="btn btn-sm">Edit</button>
+//         <button class="btn btn-sm btn-error">Delete</button>
+//     </div>
+// }
+//
+// Renders:
+// <div class="card bg-base-100 shadow-xl">
+//     <div class="card-body">
+//         <div class="flex items-start justify-between">
+//             <div class="flex gap-3">
+//                 <div class="text-4xl">📰</div>
+//                 <div>
+//                     <h2 class="card-title">
+//                         TechCrunch
+//                         <span class="badge badge-success">Working</span>
+//                     </h2>
+//                     <p class="text-sm">https://techcrunch.com/feed</p>
+//                 </div>
+//             </div>
+//         </div>
+//         <p class="text-xs text-base-content/60">Updated 2 hours ago</p>
+//         <!-- Children content (actions) -->
+//     </div>
+// </div>
+
+// Card is a placeholder component. Implementation pending.
+// TODO: Implement full Card component based on comments above.
+templ Card() {
+	<div class="card bg-base-100 shadow-xl">
+		<div class="card-body">
+			<h2 class="card-title">Card - to be implemented</h2>
+			{ children... }
+		</div>
+	</div>
+}

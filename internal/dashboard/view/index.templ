@@ -1,23 +1,90 @@
 package view
 
 import (
-	"fmt"
-	"github.com/tjanas94/vibefeeder/internal/dashboard/models"
-	sharedView "github.com/tjanas94/vibefeeder/internal/shared/view"
+	"github.com/tjanas94/vibefeeder/internal/shared/view"
+	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
 )
 
-templ Index(vm models.DashboardViewModel) {
-	@sharedView.Layout("Dashboard - Vibefeeder") {
-		<div class="container mx-auto p-4">
-			<!-- Debug info -->
-			<div class="p-4 mb-6">
-				<h2 class="text-xl font-semibold">Component: Dashboard Index</h2>
-				<p class="text-sm">View Model: { fmt.Sprintf("%+v", vm) }</p>
-			</div>
-			<!-- Feed list container -->
-			<div id="feed-list-container" hx-get="/feeds" hx-trigger="load"></div>
-			<!-- Latest summary container -->
-			<div id="summary-container" hx-get="/summaries/latest" hx-trigger="load"></div>
+// Index renders the main dashboard page with feed list container and modal structures.
+// All dynamic content (feeds, summary) is loaded via htmx from dedicated endpoints.
+templ Index(title, userEmail string) {
+	@view.Layout(title) {
+		<!-- Dashboard container with Alpine.js state for modals -->
+		<div
+			x-data="{
+				isSummaryModalOpen: false,
+				isFeedModalOpen: false,
+				isDeleteModalOpen: false
+			}"
+			@close-modals.window="isSummaryModalOpen = false; isFeedModalOpen = false; isDeleteModalOpen = false"
+		>
+			<!-- Navbar with custom dashboard buttons -->
+			@components.Navbar(components.NavbarProps{
+				UserEmail: userEmail,
+			}) {
+				<button
+					class="btn btn-ghost"
+					@click="isSummaryModalOpen = true"
+					hx-get="/summaries/latest"
+					hx-target="#summary-modal-content"
+					hx-trigger="click"
+				>
+					Podsumowanie
+				</button>
+			}
+			<!-- Main content area -->
+			<main class="container mx-auto px-4 py-8 max-w-7xl">
+				<!-- Feed list container with loading indicator -->
+				<div
+					id="feed-list-container"
+					class="min-h-[200px]"
+					hx-get="/feeds"
+					hx-trigger="load"
+				>
+					<!-- Loading spinner shown while feed list loads -->
+					@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
+				</div>
+			</main>
+			<!-- Summary Modal -->
+			@components.Modal(components.ModalProps{
+				ID:             "summary-modal",
+				ContentID:      "summary-modal-content",
+				Title:          "Najnowsze podsumowanie",
+				AlpineStateVar: "isSummaryModalOpen",
+				MaxWidth:       "4xl",
+			}) {
+				<!-- Content loaded via htmx from navbar button -->
+				@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
+			}
+			<!-- Feed Form Modal (for add/edit) -->
+			@components.Modal(components.ModalProps{
+				ID:             "feed-form-modal",
+				ContentID:      "feed-form-modal-content",
+				Title:          "Feed",
+				AlpineStateVar: "isFeedModalOpen",
+				MaxWidth:       "2xl",
+			}) {
+				<!-- Content loaded via htmx (add/edit form) -->
+				@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
+			}
+			<!-- Delete Confirmation Modal -->
+			@components.Modal(components.ModalProps{
+				ID:             "delete-confirmation-modal",
+				ContentID:      "delete-confirmation-modal-content",
+				Title:          "Potwierdź usunięcie",
+				AlpineStateVar: "isDeleteModalOpen",
+				MaxWidth:       "md",
+			}) {
+				<!-- TODO: Implement delete confirmation dialog with:
+				     - Feed name display
+				     - Warning message "Ta operacja jest nieodwracalna"
+				     - Two buttons: "Anuluj" (btn-ghost) and "Usuń" (btn-error)
+				     - htmx delete request to /feeds/{id} endpoint
+				     - Close modal on cancel or after successful delete -->
+				<div class="p-4 text-center text-base-content/70">
+					Implementacja w trakcie
+				</div>
+			}
 		</div>
 	}
 }

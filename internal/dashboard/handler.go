@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/tjanas94/vibefeeder/internal/dashboard/models"
 	"github.com/tjanas94/vibefeeder/internal/dashboard/view"
-	sharedView "github.com/tjanas94/vibefeeder/internal/shared/view"
+	"github.com/tjanas94/vibefeeder/internal/shared/auth"
+	sharedview "github.com/tjanas94/vibefeeder/internal/shared/view"
 )
 
 // Handler handles dashboard requests
@@ -25,19 +25,24 @@ func NewHandler(logger *slog.Logger) *Handler {
 // ShowDashboard renders the main dashboard page
 // Returns empty layout with htmx-enabled containers that load content dynamically
 func (h *Handler) ShowDashboard(c echo.Context) error {
-	// Create empty view model - all data loaded via htmx
-	vm := models.DashboardViewModel{}
+	// Get user ID from context (set by auth middleware)
+	userID := auth.GetUserID(c)
+
+	// TODO: Fetch actual user data from database when user service is implemented
+	// For now, use mock email based on user ID
+	mockEmail := "user@example.com"
 
 	// Render dashboard template
-	if err := c.Render(http.StatusOK, "", view.Index(vm)); err != nil {
+	if err := c.Render(http.StatusOK, "", view.Index("Dashboard - VibeFeeder", mockEmail)); err != nil {
 		h.logger.Error("failed to render dashboard",
 			"error", err,
 			"path", c.Request().URL.Path,
+			"user_id", userID,
 		)
 		return c.Render(
 			http.StatusInternalServerError,
 			"",
-			sharedView.ErrorPage(
+			sharedview.ErrorPage(
 				http.StatusInternalServerError,
 				"Internal Server Error",
 				"Failed to load dashboard. Please refresh the page.",

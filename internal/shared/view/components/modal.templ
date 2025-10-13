@@ -1,0 +1,66 @@
+package components
+
+// Modal renders a DaisyUI modal dialog with Alpine.js state management.
+// Provides a reusable structure for all modal dialogs in the application.
+//
+// Usage:
+//   @components.Modal(components.ModalProps{
+//       ID: "summary-modal",
+//       ContentID: "summary-modal-content",
+//       Title: "Latest Summary",
+//       AlpineStateVar: "isSummaryModalOpen",
+//       MaxWidth: "4xl",
+//   }) {
+//       <!-- Modal content here, or use hx-target="#summary-modal-content" -->
+//   }
+templ Modal(props ModalProps) {
+	<dialog
+		id={ props.ID }
+		class="modal"
+		x-bind:class={ getAlpineModalOpenClass(props.AlpineStateVar) }
+	>
+		<div class={ "modal-box", getModalMaxWidthClass(props.MaxWidth) }>
+			<button
+				class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+				@click={ getAlpineCloseAction(props.AlpineStateVar) }
+			>✕</button>
+			<h3 class="font-bold text-lg mb-4">{ props.Title }</h3>
+			<div id={ props.ContentID }>
+				{ children... }
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop" @click={ getAlpineCloseAction(props.AlpineStateVar) }>
+			<button>close</button>
+		</form>
+	</dialog>
+}
+
+// getModalMaxWidthClass returns the appropriate Tailwind max-width class
+func getModalMaxWidthClass(maxWidth string) string {
+	switch maxWidth {
+	case "sm":
+		return "max-w-sm"
+	case "md":
+		return "max-w-md"
+	case "lg":
+		return "max-w-lg"
+	case "xl":
+		return "max-w-xl"
+	case "2xl":
+		return "max-w-2xl"
+	case "4xl":
+		return "max-w-4xl"
+	default:
+		return "max-w-2xl"
+	}
+}
+
+// getAlpineModalOpenClass returns Alpine.js expression for modal-open class
+func getAlpineModalOpenClass(alpineStateVar string) string {
+	return "{ 'modal-open': " + alpineStateVar + " }"
+}
+
+// getAlpineCloseAction returns Alpine.js expression for closing modal
+func getAlpineCloseAction(alpineStateVar string) string {
+	return alpineStateVar + " = false"
+}

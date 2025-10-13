@@ -1,5 +1,7 @@
 package view
 
+// Layout renders the base HTML structure for all pages.
+// Pages are responsible for rendering their own navigation components.
 templ Layout(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
@@ -12,7 +14,7 @@ templ Layout(title string) {
 			<script defer src="/static/js/alpine.min.js"></script>
 			<meta name="htmx-config" content='{"responseHandling":[{"code":"204", "swap": false},{"code":"[23]..", "swap": true},{"code":"[45]..", "swap": true, "error":true},{"code":"...", "swap": false}]}'/>
 		</head>
-		<body>
+		<body class="min-h-screen bg-base-100">
 			<!-- Global HTMX Error Container -->
 			<div id="global-errors" class="fixed top-4 right-4 z-50 space-y-2 max-w-md"></div>
 			{ children... }
