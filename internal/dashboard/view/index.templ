@@ -2,6 +2,7 @@ package view
 
 import (
 	"github.com/tjanas94/vibefeeder/internal/dashboard/models"
+	feedview "github.com/tjanas94/vibefeeder/internal/feed/view"
 	"github.com/tjanas94/vibefeeder/internal/shared/view"
 	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
 )
@@ -10,12 +11,14 @@ import (
 // All dynamic content (feeds, summary) is loaded via htmx from dedicated endpoints.
 templ Index(vm models.DashboardViewModel) {
 	@view.Layout(view.LayoutProps{Title: vm.Title}) {
-		<!-- Dashboard container with Alpine.js state for modals -->
+		<!-- Dashboard container with Alpine.js state for modals and filters -->
 		<div
 			x-data="{
 				isSummaryModalOpen: false,
 				isFeedModalOpen: false,
-				isDeleteModalOpen: false
+				isDeleteModalOpen: false,
+				search: new URL(window.location.href).searchParams.get('search') || '',
+				status: new URL(window.location.href).searchParams.get('status') || 'all'
 			}"
 			@close-modals.window="isSummaryModalOpen = false; isFeedModalOpen = false; isDeleteModalOpen = false"
 		>
@@ -24,7 +27,7 @@ templ Index(vm models.DashboardViewModel) {
 				UserEmail: vm.UserEmail,
 			}) {
 				<button
-					class="btn btn-ghost"
+					class="btn btn-ghost hover:btn-neutral"
 					@click="isSummaryModalOpen = true"
 					hx-get="/summaries/latest"
 					hx-target="#summary-modal-content"
@@ -35,15 +38,20 @@ templ Index(vm models.DashboardViewModel) {
 			}
 			<!-- Main content area -->
 			<main class="container mx-auto px-4 py-8 max-w-7xl">
-				<!-- Feed list container with loading indicator -->
-				<div
-					id="feed-list-container"
-					class="min-h-[200px]"
-					hx-get="/feeds"
-					hx-trigger="load"
-				>
-					<!-- Loading spinner shown while feed list loads -->
-					@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
+				<div class="space-y-6">
+					<!-- Search and Filter Bar (stays here, not re-rendered by htmx) -->
+					@feedview.FeedSearchFilter()
+					<!-- Feed list container (updated by htmx) -->
+					<div
+						id="feed-list"
+						class="min-h-[200px]"
+						hx-get="/feeds"
+						hx-trigger="load"
+						hx-vals="js:{search: new URL(window.location.href).searchParams.get('search') || '', status: new URL(window.location.href).searchParams.get('status') || ''}"
+					>
+						<!-- Loading spinner shown while feed list loads -->
+						@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
+					</div>
 				</div>
 			</main>
 			<!-- Summary Modal -->

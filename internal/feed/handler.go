@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
@@ -61,6 +62,26 @@ func (h *Handler) ListFeeds(c echo.Context) error {
 		h.logger.Error("failed to list feeds", "user_id", userID, "error", err)
 		return h.renderError(c, http.StatusInternalServerError, "Failed to load feeds")
 	}
+
+	// Build URL for HX-Push-Url header to update browser history
+	pushURL := "/dashboard"
+	params := make(url.Values)
+
+	if query.Search != "" {
+		params.Set("search", query.Search)
+	}
+	if query.Status != "" && query.Status != "all" {
+		params.Set("status", query.Status)
+	}
+	if query.Page > 1 {
+		params.Set("page", fmt.Sprintf("%d", query.Page))
+	}
+
+	if len(params) > 0 {
+		pushURL += "?" + params.Encode()
+	}
+
+	c.Response().Header().Set("HX-Push-Url", pushURL)
 
 	// Success - render list view with view model
 	return c.Render(http.StatusOK, "", view.List(*vm))

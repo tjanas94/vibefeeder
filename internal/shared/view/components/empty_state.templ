@@ -1,43 +1,28 @@
 package components
 
-// TODO: Implement EmptyState component
-//
-// EmptyState should render a centered message with an icon/emoji,
-// title, description, and optional call-to-action button.
-//
-// Use cases:
-// 1. Feed list - no feeds yet (initial onboarding)
-//    - Icon: 📡
-//    - Title: "Nie masz jeszcze żadnych feedów"
-//    - Description: "Dodaj swój pierwszy feed RSS, aby zacząć czytać artykuły"
-//    - Action: "Dodaj pierwszy feed" (opens modal)
-//
-// 2. Feed list - no search results
-//    - Icon: 🔍
-//    - Title: "Nie znaleziono feedów"
-//    - Description: "Spróbuj zmienić kryteria wyszukiwania lub filtry"
-//    - Action: "Wyczyść filtry" (resets filters)
-//
-// 3. Summary modal - no summary yet
-//    - Icon: 📝
-//    - Title: "Nie wygenerowano jeszcze żadnego podsumowania"
-//    - Description: empty
-//    - Action: "Generuj pierwsze podsumowanie" (triggers POST)
-//
-// Proposed structure:
-//
-// type EmptyStateProps struct {
-//     Icon        string  // emoji or icon class
-//     Title       string
-//     Description string  // optional
-//     ActionText  string  // optional button text
-//     ActionAttrs string  // optional htmx/alpine attributes for button
-// }
-
-// EmptyState is a placeholder component. Implementation pending.
-// TODO: Implement full EmptyState component based on comments above.
-templ EmptyState() {
+// EmptyState renders a centered message with an icon, title, description, and optional call-to-action button.
+templ EmptyState(props EmptyStateProps) {
 	<div class="text-center py-12">
-		<p class="text-gray-500">EmptyState component - to be implemented</p>
+		<!-- Icon/Emoji -->
+		if props.Icon != "" {
+			<div class="text-6xl mb-4">{ props.Icon }</div>
+		}
+		<!-- Title -->
+		if props.Title != "" {
+			<h3 class="text-xl font-semibold mb-2">{ props.Title }</h3>
+		}
+		<!-- Description -->
+		if props.Description != "" {
+			<p class="text-base-content/70 mb-6">{ props.Description }</p>
+		}
+		<!-- Call-to-action button (optional) -->
+		if props.ActionText != "" {
+			<button
+				class="btn btn-primary"
+				{ props.ActionAttrs... }
+			>
+				{ props.ActionText }
+			</button>
+		}
 	</div>
 }

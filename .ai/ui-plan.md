@@ -151,9 +151,10 @@ Główny widok po zalogowaniu to "powłoka aplikacji" (app shell), która zawier
 - **Nawigacja prywatna (zalogowany użytkownik):**
   - **Lokalizacja:** Stały, górny pasek nawigacyjny (DaisyUI `navbar`) widoczny na wszystkich ekranach po zalogowaniu.
   - **Struktura:**
-    - **Lewa strona:** Logo/nazwa aplikacji ("VibeFeeder").
-    - **Prawa strona:**
+    - **Lewa strona:**
+      - Logo/nazwa aplikacji ("VibeFeeder").
       - Przycisk "Podsumowanie" (otwiera modal podsumowania).
+    - **Prawa strona:**
       - E-mail zalogowanego użytkownika.
       - Przycisk/link "Wyloguj".
 

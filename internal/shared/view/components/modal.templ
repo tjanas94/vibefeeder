@@ -18,6 +18,7 @@ templ Modal(props ModalProps) {
 		id={ props.ID }
 		class="modal"
 		x-bind:class={ getAlpineModalOpenClass(props.AlpineStateVar) }
+		@keydown.escape={ getAlpineCloseAction(props.AlpineStateVar) }
 	>
 		<div class={ "modal-box", getModalMaxWidthClass(props.MaxWidth) }>
 			<button

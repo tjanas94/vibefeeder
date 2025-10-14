@@ -1,56 +1,61 @@
 package components
 
-// TODO: Implement Pagination component
-//
-// Pagination controls for navigating through paged results.
-// Should integrate with htmx for dynamic page loading.
-//
-// Use cases:
-// 1. Feed list pagination
-//    - Shows current page and total pages
-//    - Previous/Next buttons
-//    - Page number links
-//
-// Features:
-// - Show ellipsis (...) for large page ranges
-// - Disable prev/next buttons at boundaries
-// - Highlight current page
-// - Use htmx to load pages without full refresh
-//
-// Proposed structure:
-//
-// type PaginationProps struct {
-//     CurrentPage int
-//     TotalPages  int
-//     BaseURL     string       // e.g., "/feeds"
-//     QueryParams string       // e.g., "search=test&status=working"
-//     HasPrevious bool
-//     HasNext     bool
-// }
-//
-// Example usage:
-// @components.Pagination(components.PaginationProps{
-//     CurrentPage: 2,
-//     TotalPages: 10,
-//     BaseURL: "/feeds",
-//     QueryParams: "search=tech",
-//     HasPrevious: true,
-//     HasNext: true,
-// })
-//
-// Renders DaisyUI join component with buttons:
-// <div class="join">
-//     <button class="join-item btn" hx-get="/feeds?page=1&search=tech">«</button>
-//     <button class="join-item btn">1</button>
-//     <button class="join-item btn btn-active">2</button>
-//     <button class="join-item btn">3</button>
-//     <button class="join-item btn" hx-get="/feeds?page=3&search=tech">»</button>
-// </div>
+import (
+	"fmt"
 
-// Pagination is a placeholder component. Implementation pending.
-// TODO: Implement full Pagination component based on comments above.
-templ Pagination() {
+	"github.com/tjanas94/vibefeeder/internal/shared/models"
+)
+
+// Pagination renders pagination controls for navigating through paged results
+// Integrates with htmx for dynamic page loading
+// Uses hx-include to send form inputs (search, status) with pagination requests
+templ Pagination(props PaginationProps) {
 	<div class="join">
-		<button class="join-item btn">Pagination - to be implemented</button>
+		<!-- Previous Button -->
+		if props.Pagination.HasPrevious {
+			<button
+				class="join-item btn"
+				hx-get={ models.BuildPageURL(props.BaseURL, props.Pagination.CurrentPage-1) }
+				hx-target="#feed-list"
+				hx-include={ props.FormID }
+			>
+				«
+			</button>
+		} else {
+			<button class="join-item btn btn-disabled" disabled>«</button>
+		}
+		<!-- Page Numbers -->
+		for _, pageNum := range models.GetPaginationRange(props.Pagination.CurrentPage, props.Pagination.TotalPages) {
+			if pageNum == -1 {
+				<!-- Ellipsis -->
+				<button class="join-item btn btn-disabled" disabled>...</button>
+			} else if pageNum == props.Pagination.CurrentPage {
+				<!-- Current Page -->
+				<button class="join-item btn btn-active">{ fmt.Sprintf("%d", pageNum) }</button>
+			} else {
+				<!-- Other Pages -->
+				<button
+					class="join-item btn"
+					hx-get={ models.BuildPageURL(props.BaseURL, pageNum) }
+					hx-target="#feed-list"
+					hx-include={ props.FormID }
+				>
+					{ fmt.Sprintf("%d", pageNum) }
+				</button>
+			}
+		}
+		<!-- Next Button -->
+		if props.Pagination.HasNext {
+			<button
+				class="join-item btn"
+				hx-get={ models.BuildPageURL(props.BaseURL, props.Pagination.CurrentPage+1) }
+				hx-target="#feed-list"
+				hx-include={ props.FormID }
+			>
+				»
+			</button>
+		} else {
+			<button class="join-item btn btn-disabled" disabled>»</button>
+		}
 	</div>
 }

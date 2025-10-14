@@ -3,12 +3,173 @@ package view
 import (
 	"fmt"
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
+	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
 )
 
-// List renders the feed list component (debug version)
+// List renders the feed list results (without search filter).
+// Search filter is in dashboard/view/index.templ to prevent re-rendering and focus loss.
 templ List(vm models.FeedListViewModel) {
-	<div class="p-4">
-		<h1 class="text-2xl font-bold mb-4">internal/feed/view/list.templ</h1>
-		<pre>{ fmt.Sprintf("%+v", vm) }</pre>
-	</div>
+	<!-- Conditional rendering: Empty state, No results, or Feed list -->
+	if vm.ShowEmptyState {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:        "📡",
+			Title:       "Nie masz jeszcze żadnych feedów",
+			Description: "Dodaj swój pierwszy feed RSS, aby zacząć czytać artykuły",
+			ActionText:  "Dodaj pierwszy feed",
+			ActionAttrs: templ.Attributes{
+				"@click":     "isFeedModalOpen = true",
+				"hx-get":     "/feeds/new",
+				"hx-target":  "#feed-form-modal-content",
+				"hx-trigger": "click",
+			},
+		})
+	} else if len(vm.Feeds) == 0 {
+		<!-- No results found after filtering -->
+		<div class="text-center py-12">
+			<div class="text-6xl mb-4">🔍</div>
+			<h3 class="text-xl font-semibold mb-2">Nie znaleziono feedów</h3>
+			<p class="text-base-content/70">Spróbuj zmienić kryteria wyszukiwania lub filtry</p>
+		</div>
+	} else {
+		<!-- Feed List Table -->
+		<div class="overflow-x-auto">
+			<table class="table table-zebra w-full">
+				<thead>
+					<tr>
+						<th>Nazwa</th>
+						<th>URL</th>
+						<th>Status</th>
+						<th class="text-right">Akcje</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, feed := range vm.Feeds {
+						@FeedListItem(feed)
+					}
+				</tbody>
+			</table>
+		</div>
+		<!-- Pagination -->
+		if vm.Pagination.TotalPages > 1 {
+			<div class="flex justify-center mt-6">
+				@components.Pagination(components.PaginationProps{
+					Pagination: vm.Pagination,
+					BaseURL:    "/feeds",
+					FormID:     "#feed-filter-form",
+				})
+			</div>
+		}
+	}
+}
+
+// FeedSearchFilter renders the search input and status filter buttons.
+// Uses Alpine state (search, status) from parent dashboard container.
+templ FeedSearchFilter() {
+	<form
+		id="feed-filter-form"
+		class="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center"
+		hx-get="/feeds"
+		hx-target="#feed-list"
+		hx-trigger="change from:input[type=radio], keyup changed delay:500ms from:input[type=search]"
+	>
+		<!-- Search Input -->
+		<input
+			type="search"
+			name="search"
+			placeholder="Szukaj po nazwie..."
+			class="input input-bordered flex-1"
+			x-model="search"
+		/>
+		<!-- Status Filter Radio Buttons (styled as buttons) -->
+		<div class="join">
+			<input
+				type="radio"
+				name="status"
+				value="all"
+				class="join-item btn btn-neutral checked:btn-secondary"
+				aria-label="Wszystkie"
+				x-model="status"
+			/>
+			<input
+				type="radio"
+				name="status"
+				value="working"
+				class="join-item btn btn-neutral checked:btn-secondary"
+				aria-label="Działające"
+				x-model="status"
+			/>
+			<input
+				type="radio"
+				name="status"
+				value="error"
+				class="join-item btn btn-neutral checked:btn-secondary"
+				aria-label="Z błędami"
+				x-model="status"
+			/>
+		</div>
+		<!-- Add Feed Button -->
+		<button
+			type="button"
+			class="btn btn-primary"
+			@click="isFeedModalOpen = true"
+			hx-get="/feeds/new"
+			hx-target="#feed-form-modal-content"
+			hx-trigger="click"
+		>
+			<span class="text-lg">+</span>
+			Dodaj feed
+		</button>
+	</form>
+}
+
+// FeedListItem renders a single feed row in the table
+templ FeedListItem(feed models.FeedItemViewModel) {
+	<tr>
+		<!-- Feed Name -->
+		<td class="font-medium">{ feed.Name }</td>
+		<!-- Feed URL -->
+		<td class="text-sm text-base-content/70 max-w-md truncate">
+			{ feed.URL }
+		</td>
+		<!-- Status with Error Tooltip -->
+		<td>
+			if feed.HasError {
+				<div class="tooltip tooltip-top" data-tip={ feed.ErrorMessage }>
+					<span class="badge badge-error gap-2">
+						<span class="text-sm">⚠️</span>
+						Błąd
+					</span>
+				</div>
+			} else {
+				<span class="badge badge-success gap-2">
+					<span class="text-sm">✓</span>
+					OK
+				</span>
+			}
+		</td>
+		<!-- Actions -->
+		<td class="text-right">
+			<div class="flex gap-2 justify-end">
+				<!-- Edit Button -->
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost"
+					@click="isFeedModalOpen = true"
+					hx-get={ fmt.Sprintf("/feeds/%s/edit", feed.ID) }
+					hx-target="#feed-form-modal-content"
+					hx-trigger="click"
+				>
+					✏️
+				</button>
+				<!-- Delete Button -->
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost text-error"
+					@click="isDeleteModalOpen = true"
+				>
+					🗑️
+				</button>
+			</div>
+		</td>
+	</tr>
 }
