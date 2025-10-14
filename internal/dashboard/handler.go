@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/tjanas94/vibefeeder/internal/dashboard/models"
 	"github.com/tjanas94/vibefeeder/internal/dashboard/view"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
 	sharedview "github.com/tjanas94/vibefeeder/internal/shared/view"
@@ -32,8 +33,14 @@ func (h *Handler) ShowDashboard(c echo.Context) error {
 	// For now, use mock email based on user ID
 	mockEmail := "user@example.com"
 
+	// Prepare view model
+	vm := models.DashboardViewModel{
+		Title:     "Dashboard - VibeFeeder",
+		UserEmail: mockEmail,
+	}
+
 	// Render dashboard template
-	if err := c.Render(http.StatusOK, "", view.Index("Dashboard - VibeFeeder", mockEmail)); err != nil {
+	if err := c.Render(http.StatusOK, "", view.Index(vm)); err != nil {
 		h.logger.Error("failed to render dashboard",
 			"error", err,
 			"path", c.Request().URL.Path,
@@ -42,11 +49,11 @@ func (h *Handler) ShowDashboard(c echo.Context) error {
 		return c.Render(
 			http.StatusInternalServerError,
 			"",
-			sharedview.ErrorPage(
-				http.StatusInternalServerError,
-				"Internal Server Error",
-				"Failed to load dashboard. Please refresh the page.",
-			),
+			sharedview.ErrorPage(sharedview.ErrorPageProps{
+				Code:    http.StatusInternalServerError,
+				Title:   "Internal Server Error",
+				Message: "Failed to load dashboard. Please refresh the page.",
+			}),
 		)
 	}
 

@@ -1,14 +1,15 @@
 package view
 
 import (
+	"github.com/tjanas94/vibefeeder/internal/dashboard/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/view"
 	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
 )
 
 // Index renders the main dashboard page with feed list container and modal structures.
 // All dynamic content (feeds, summary) is loaded via htmx from dedicated endpoints.
-templ Index(title, userEmail string) {
-	@view.Layout(title) {
+templ Index(vm models.DashboardViewModel) {
+	@view.Layout(view.LayoutProps{Title: vm.Title}) {
 		<!-- Dashboard container with Alpine.js state for modals -->
 		<div
 			x-data="{
@@ -20,7 +21,7 @@ templ Index(title, userEmail string) {
 		>
 			<!-- Navbar with custom dashboard buttons -->
 			@components.Navbar(components.NavbarProps{
-				UserEmail: userEmail,
+				UserEmail: vm.UserEmail,
 			}) {
 				<button
 					class="btn btn-ghost"

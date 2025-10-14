@@ -72,10 +72,16 @@ func NewHTTPErrorHandler(logger *slog.Logger) echo.HTTPErrorHandler {
 		var component templ.Component
 		if isHTMX {
 			// For HTMX requests, use error fragment with hx-swap-oob
-			component = sharedview.ErrorFragment(message)
+			component = sharedview.ErrorFragment(sharedview.ErrorFragmentProps{
+				Message: message,
+			})
 		} else {
 			// For regular requests, use the full error page
-			component = sharedview.ErrorPage(code, title, message)
+			component = sharedview.ErrorPage(sharedview.ErrorPageProps{
+				Code:    code,
+				Title:   title,
+				Message: message,
+			})
 		}
 
 		// Render the component

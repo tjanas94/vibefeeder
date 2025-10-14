@@ -21,19 +21,27 @@ func main() {
 
 	logger := application.Logger
 
+	// Channel to capture server errors
+	serverErrors := make(chan error, 1)
+
 	// Start server in a goroutine
 	go func() {
 		if err := application.Start(); err != nil {
-			logger.Info("Server stopped", "error", err)
+			serverErrors <- err
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the server
+	// Wait for interrupt signal or server error
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	<-quit
 
-	logger.Info("Received shutdown signal")
+	select {
+	case err := <-serverErrors:
+		logger.Error("Server failed to start", "error", err)
+		os.Exit(1)
+	case <-quit:
+		logger.Info("Received shutdown signal")
+	}
 
 	// Create shutdown context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

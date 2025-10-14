@@ -4,10 +4,10 @@ import "github.com/tjanas94/vibefeeder/internal/shared/view/components"
 
 // ErrorFragment renders a simple error alert for HTMX requests
 // Uses hx-swap-oob to inject into global error container
-templ ErrorFragment(message string) {
+templ ErrorFragment(props ErrorFragmentProps) {
 	@components.Alert(components.AlertProps{
 		Type:     "error",
-		Message:  message,
+		Message:  props.Message,
 		ShowIcon: true,
 		UseOOB:   true,
 	})
