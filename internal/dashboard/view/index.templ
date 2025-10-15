@@ -5,6 +5,7 @@ import (
 	feedview "github.com/tjanas94/vibefeeder/internal/feed/view"
 	"github.com/tjanas94/vibefeeder/internal/shared/view"
 	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
+	summaryview "github.com/tjanas94/vibefeeder/internal/summary/view"
 )
 
 // Index renders the main dashboard page with feed list container and modal structures.
@@ -26,28 +27,7 @@ templ Index(vm models.DashboardViewModel) {
 			@components.Navbar(components.NavbarProps{
 				UserEmail: vm.UserEmail,
 			}) {
-				<!-- Disabled button with tooltip when no feeds -->
-				<template x-if="!hasFeeds">
-					@components.Tooltip(components.TooltipProps{
-						Text:     "Add at least one feed to generate a summary",
-						Position: "bottom",
-					}) {
-						<button class="btn btn-ghost hover:btn-neutral" disabled>
-							Summary
-						</button>
-					}
-				</template>
-				<!-- Active button when feeds exist -->
-				<button
-					x-show="hasFeeds"
-					class="btn btn-ghost hover:btn-neutral"
-					@click="lastFocusedElement = $event.target"
-					hx-get="/summaries/latest"
-					hx-target="#summary-modal-content"
-					hx-trigger="click"
-				>
-					Summary
-				</button>
+				@summaryview.NavbarButton()
 			}
 			<!-- Main content area -->
 			<main id="main-content" class="container mx-auto px-4 py-8 max-w-7xl">
@@ -68,7 +48,6 @@ templ Index(vm models.DashboardViewModel) {
 						hx-trigger="load, refreshFeedList from:document"
 						hx-include="#feed-filter-form"
 					>
-						<!-- Loading spinner shown while feed list loads -->
 						@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
 					</div>
 				</div>
@@ -80,8 +59,6 @@ templ Index(vm models.DashboardViewModel) {
 				AlpineStateVar: "openModal === 'summary'",
 				MaxWidth:       "4xl",
 			}) {
-				<!-- Content loaded via htmx from navbar button -->
-				@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
 			}
 			<!-- Feed Form Modal (for add/edit) -->
 			@components.Modal(components.ModalProps{
@@ -90,8 +67,6 @@ templ Index(vm models.DashboardViewModel) {
 				AlpineStateVar: "openModal === 'feed'",
 				MaxWidth:       "2xl",
 			}) {
-				<!-- Content loaded via htmx (add/edit form) -->
-				@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
 			}
 			<!-- Delete Confirmation Modal -->
 			@components.Modal(components.ModalProps{
@@ -100,28 +75,24 @@ templ Index(vm models.DashboardViewModel) {
 				AlpineStateVar: "openModal === 'delete'",
 				MaxWidth:       "md",
 			}) {
-				<!-- Content loaded via htmx from delete button -->
-				@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
 			}
 		</div>
 		<script>
 			// Focus management for modals after htmx loads content
 			document.body.addEventListener("htmx:afterSwap", (event) => {
 				const { target, requestConfig } = event.detail;
-				if (requestConfig.verb !== "get") return;
+				if (!requestConfig || requestConfig.verb !== "get") return;
 
 				const focusMap = {
 					"feed-form-modal-content": "#feed-name",
 					"delete-confirmation-modal-content": "#delete-confirmation-modal-content .btn-ghost",
 				};
 
-				const selector = focusMap[target.id];
+				const selector = target && focusMap[target.id];
 				if (selector) {
 					setTimeout(() => {
 						const element = document.querySelector(selector);
-						if (element) {
-							element.focus();
-						}
+						if (element) element.focus();
 					}, 50);
 				}
 			});

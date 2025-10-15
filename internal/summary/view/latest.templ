@@ -1,0 +1,193 @@
+package view
+
+import (
+	"fmt"
+	"html"
+	"time"
+
+	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
+	"github.com/tjanas94/vibefeeder/internal/summary/models"
+)
+
+// Summary modal view fragments: Display, Content, EmptyState, LoadingState, Error.
+// The modal container itself is provided by components.Modal; handlers render
+// Display (normal flow) or Error (domain failure) directly.
+
+// =======================
+// Display Orchestrator
+// =======================
+//
+// Decides which state to render based on the SummaryDisplayViewModel.
+// Priority:
+// 1. If Summary present -> Content
+// 2. Else if ShowEmptyState -> EmptyState
+// 3. Fallback -> EmptyState (defensive)
+templ Display(vm models.SummaryDisplayViewModel) {
+	<!-- Root container for summary display -->
+	<section
+		aria-labelledby="summary-modal-title"
+		aria-live="polite"
+		class="space-y-4"
+	>
+		<h3 id="summary-modal-title" class="font-bold text-xl">
+			Daily Summary
+		</h3>
+		<form
+			hx-post="/summaries"
+			hx-target="#summary-modal-content"
+			hx-swap="innerHTML"
+			class="space-y-4"
+		>
+			if vm.ErrorMessage != "" {
+				@Error(models.SummaryErrorViewModel{ErrorMessage: vm.ErrorMessage})
+			} else if vm.Summary != nil {
+				@Content(*vm.Summary, vm.CanGenerate)
+			} else if vm.ShowEmptyState {
+				@EmptyState(vm.CanGenerate)
+			} else {
+				@EmptyState(vm.CanGenerate)
+			}
+		</form>
+	</section>
+}
+
+// =============
+// Content State
+// =============
+//
+// Renders the existing summary content and metadata.
+// Shows "Generate New Summary" if the user can generate another summary.
+templ Content(summary models.SummaryViewModel, canGenerate bool) {
+	<article class="prose max-w-none" aria-label="AI generated summary">
+		<h4 class="text-lg font-semibold mb-2">Latest Summary</h4>
+		<p class="text-sm text-base-content/70 mb-4">
+			Generated at
+			<time datetime={ summary.CreatedAt.Format(time.RFC3339) }>
+				{ summary.CreatedAt.Local().Format("Jan 2, 2006 15:04") }
+			</time>
+		</p>
+		<div class="whitespace-pre-line leading-relaxed text-base">
+			{ sanitizeSummaryContent(summary.Content) }
+		</div>
+	</article>
+	<div class="flex items-center justify-between mt-6 gap-4 flex-wrap">
+		<div class="text-xs text-base-content/60">
+			Summaries are generated from your feeds' articles from the last 24 hours.
+		</div>
+		if canGenerate {
+			<div class="inline-flex items-center gap-2 min-h-[2.75rem]">
+				<button
+					type="submit"
+					class="btn btn-primary btn-sm hide-during-request"
+					aria-label="Generate a new AI summary from the last 24 hours of articles"
+				>
+					Generate New Summary
+				</button>
+				@LoadingState()
+			</div>
+		} else {
+			<span class="text-xs text-warning">
+				Add a feed to generate a new summary.
+			</span>
+		}
+	</div>
+}
+
+// =======================
+// Empty State (no summary)
+// =======================
+//
+// Encourages the user to generate their first summary.
+templ EmptyState(canGenerate bool) {
+	if canGenerate {
+		<div class="text-center py-12">
+			<div class="text-6xl mb-4" aria-hidden="true">📝</div>
+			<h2 class="text-xl font-semibold mb-2">No summary generated yet</h2>
+			<p class="text-base-content/70 mb-6">
+				Generate a daily summary to get a concise overview of the most recent content from your subscribed feeds.
+			</p>
+			<div class="inline-flex items-center gap-2 min-h-[2.75rem]">
+				<button
+					type="submit"
+					class="btn btn-primary hide-during-request"
+					aria-label="Generate your first AI summary"
+				>
+					Generate Summary
+				</button>
+				@LoadingState()
+			</div>
+		</div>
+	} else {
+		@components.EmptyState(components.EmptyStateProps{
+			Icon:        "📝",
+			Title:       "No summary generated yet",
+			Description: "Add a feed first, then return here to generate your first summary.",
+		})
+	}
+}
+
+// ==============
+// Loading State
+// ==============
+//
+// HTMX indicator element. Displayed automatically while requests in this container
+// are in-flight. It is always present (hidden when not active).
+templ LoadingState() {
+	<div
+		id="summary-loading-state"
+		class="htmx-indicator flex items-center justify-start gap-2"
+		role="status"
+		aria-live="polite"
+		aria-busy="true"
+	>
+		<span class="loading loading-spinner loading-lg" aria-hidden="true"></span>
+		<span class="text-sm font-medium">Generating your summary...</span>
+	</div>
+}
+
+// =============
+// Error State
+// =============
+//
+// Renders an error message with retry action. Assumes user can still generate.
+templ Error(vm models.SummaryErrorViewModel) {
+	<div class="text-center py-12">
+		<div class="text-6xl mb-4" aria-hidden="true">⚠️</div>
+		<h2 class="text-xl font-semibold mb-2">Failed to generate summary</h2>
+		<p class="text-base-content/70 mb-6">{ vm.ErrorMessage }</p>
+		<div class="inline-flex items-center gap-2 min-h-[2.75rem]">
+			<button
+				type="submit"
+				class="btn btn-primary hide-during-request"
+				aria-label="Try generating the AI summary again"
+			>
+				Try Again
+			</button>
+			@LoadingState()
+		</div>
+	</div>
+}
+
+// sanitizeSummaryContent escapes any unsafe HTML to prevent injection.
+// The content returned by AI should be treated as untrusted unless sanitized upstream.
+func sanitizeSummaryContent(content string) string {
+	return html.EscapeString(content)
+}
+
+// (Optional) Utility to produce relative time strings if needed in future enhancements.
+func humanizeTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%d min ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%d hrs ago", int(d.Hours()))
+	default:
+		return t.Format("Jan 2, 2006 15:04")
+	}
+}

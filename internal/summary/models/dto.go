@@ -27,7 +27,8 @@ type SummaryViewModel struct {
 type SummaryDisplayViewModel struct {
 	Summary        *SummaryViewModel `json:"summary,omitempty"`
 	ShowEmptyState bool              `json:"show_empty_state"`
-	CanGenerate    bool              `json:"can_generate"` // true if user has at least one working feed
+	CanGenerate    bool              `json:"can_generate"`            // true if user has at least one working feed
+	ErrorMessage   string            `json:"error_message,omitempty"` // non-empty -> render error state instead of other states
 }
 
 // SummaryErrorViewModel represents errors during summary generation.

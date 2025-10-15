@@ -27,7 +27,7 @@ func GetPaginationRange(currentPage, totalPages int) []int {
 	if totalPages <= 7 {
 		// Show all pages if 7 or fewer
 		pages := make([]int, totalPages)
-		for i := 0; i < totalPages; i++ {
+		for i := range totalPages {
 			pages[i] = i + 1
 		}
 		return pages

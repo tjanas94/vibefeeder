@@ -75,12 +75,6 @@ templ List(vm models.FeedListViewModel) {
 	}
 }
 
-// FeedSearchFilterProps defines properties for the feed search filter
-type FeedSearchFilterProps struct {
-	Search string // Initial search value from query params
-	Status string // Initial status filter value from query params
-}
-
 // FeedSearchFilter renders the search input and status filter buttons.
 // Uses native form values - no Alpine state needed, htmx serializes the form.
 templ FeedSearchFilter(props FeedSearchFilterProps) {

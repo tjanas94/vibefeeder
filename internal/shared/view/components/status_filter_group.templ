@@ -1,12 +1,5 @@
 package components
 
-// StatusFilterGroupProps defines properties for the status filter button group
-type StatusFilterGroupProps struct {
-	Name          string   // Name attribute for the radio group
-	Options       []string // List of status values: "all", "working", "pending", "error"
-	SelectedValue string   // Currently selected value (from query params)
-}
-
 // statusLabels maps status values to their display labels
 var statusLabels = map[string]string{
 	"all":     "All",

@@ -146,3 +146,42 @@ type FormFieldProps struct {
 	// Required indicates if the field is required (shows * in label and adds required attribute)
 	Required bool
 }
+
+// StatusFilterButtonProps defines configuration for a single status filter radio button.
+// Used within StatusFilterGroup.
+type StatusFilterButtonProps struct {
+	// Name attribute for the radio group.
+	Name string
+
+	// Value for this specific option.
+	Value string
+
+	// Visible label for the button.
+	Label string
+
+	// Whether this option is currently selected.
+	Checked bool
+}
+
+// StatusFilterGroupProps defines configuration for the status filter button group.
+// Renders a mutually exclusive set of status options.
+type StatusFilterGroupProps struct {
+	// Name attribute for the radio group.
+	Name string
+
+	// List of status values: "all", "working", "pending", "error".
+	Options []string
+
+	// Currently selected value (from query params).
+	SelectedValue string
+}
+
+// TooltipProps defines configuration for the Tooltip wrapper component.
+// Wraps arbitrary content and shows contextual text on hover/focus.
+type TooltipProps struct {
+	// Tooltip text to display on hover/focus.
+	Text string
+
+	// "top", "bottom", "left", "right" (default: "top").
+	Position string
+}

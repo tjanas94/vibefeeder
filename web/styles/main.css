@@ -15,4 +15,8 @@
   .htmx-request .htmx-indicator {
     display: inline-block;
   }
+
+  .htmx-request .hide-during-request {
+    display: none !important;
+  }
 }

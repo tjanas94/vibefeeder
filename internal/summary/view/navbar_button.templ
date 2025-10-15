@@ -1,0 +1,37 @@
+package view
+
+import "github.com/tjanas94/vibefeeder/internal/shared/view/components"
+
+// NavbarButton renders the Summary button controlled purely by Alpine state (hasFeeds).
+// Mirrors the inline implementation previously in dashboard index.
+// Usage: @summaryview.NavbarButton()
+templ NavbarButton() {
+	<!-- Disabled button with tooltip when no feeds -->
+	<template x-if="!hasFeeds">
+		@components.Tooltip(components.TooltipProps{
+			Text:     "Add at least one feed to generate a summary",
+			Position: "bottom",
+		}) {
+			<button
+				class="btn btn-ghost hover:btn-neutral"
+				disabled
+				aria-disabled="true"
+				aria-label="Summary (disabled – add at least one feed to enable)"
+			>
+				Summary
+			</button>
+		}
+	</template>
+	<!-- Active button when feeds exist -->
+	<button
+		x-show="hasFeeds"
+		class="btn btn-ghost hover:btn-neutral"
+		@click="lastFocusedElement = $event.target"
+		hx-get="/summaries/latest"
+		hx-target="#summary-modal-content"
+		hx-trigger="click"
+		aria-label="View latest AI summary"
+	>
+		Summary
+	</button>
+}
