@@ -31,9 +31,11 @@ func (a *App) setupRoutes() {
 	feedService := feed.NewService(a.DB, a.Logger)
 	feedHandler := feed.NewHandler(feedService, a.Logger)
 	a.Echo.GET("/feeds", feedHandler.ListFeeds)
+	a.Echo.GET("/feeds/new", feedHandler.HandleFeedAddForm)
 	a.Echo.POST("/feeds", feedHandler.CreateFeed)
 	a.Echo.GET("/feeds/:id/edit", feedHandler.HandleFeedEditForm)
 	a.Echo.POST("/feeds/:id", feedHandler.HandleUpdate)
+	a.Echo.GET("/feeds/:id/delete", feedHandler.HandleDeleteConfirmation)
 	a.Echo.DELETE("/feeds/:id", feedHandler.DeleteFeed)
 
 	// Summary routes (authenticated with rate limiting)

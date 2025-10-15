@@ -10,52 +10,65 @@ import (
 // Integrates with htmx for dynamic page loading
 // Uses hx-include to send form inputs (search, status) with pagination requests
 templ Pagination(props PaginationProps) {
-	<div class="join">
-		<!-- Previous Button -->
-		if props.Pagination.HasPrevious {
-			<button
-				class="join-item btn"
-				hx-get={ models.BuildPageURL(props.BaseURL, props.Pagination.CurrentPage-1) }
-				hx-target="#feed-list"
-				hx-include={ props.FormID }
-			>
-				«
-			</button>
-		} else {
-			<button class="join-item btn btn-disabled" disabled>«</button>
-		}
-		<!-- Page Numbers -->
-		for _, pageNum := range models.GetPaginationRange(props.Pagination.CurrentPage, props.Pagination.TotalPages) {
-			if pageNum == -1 {
-				<!-- Ellipsis -->
-				<button class="join-item btn btn-disabled" disabled>...</button>
-			} else if pageNum == props.Pagination.CurrentPage {
-				<!-- Current Page -->
-				<button class="join-item btn btn-active">{ fmt.Sprintf("%d", pageNum) }</button>
-			} else {
-				<!-- Other Pages -->
+	<nav class="flex justify-center mt-6" aria-label="Pagination">
+		<div class="join" role="group">
+			<!-- Previous Button -->
+			if props.Pagination.HasPrevious {
 				<button
 					class="join-item btn"
-					hx-get={ models.BuildPageURL(props.BaseURL, pageNum) }
+					hx-get={ models.BuildPageURL(props.BaseURL, props.Pagination.CurrentPage-1) }
 					hx-target="#feed-list"
 					hx-include={ props.FormID }
+					aria-label={ fmt.Sprintf("Go to previous page %d", props.Pagination.CurrentPage-1) }
 				>
-					{ fmt.Sprintf("%d", pageNum) }
+					<span aria-hidden="true">«</span>
+				</button>
+			} else {
+				<button class="join-item btn btn-disabled" disabled aria-label="Previous page unavailable">
+					<span aria-hidden="true">«</span>
 				</button>
 			}
-		}
-		<!-- Next Button -->
-		if props.Pagination.HasNext {
-			<button
-				class="join-item btn"
-				hx-get={ models.BuildPageURL(props.BaseURL, props.Pagination.CurrentPage+1) }
-				hx-target="#feed-list"
-				hx-include={ props.FormID }
-			>
-				»
-			</button>
-		} else {
-			<button class="join-item btn btn-disabled" disabled>»</button>
-		}
-	</div>
+			<!-- Page Numbers -->
+			for _, pageNum := range models.GetPaginationRange(props.Pagination.CurrentPage, props.Pagination.TotalPages) {
+				if pageNum == -1 {
+					<!-- Ellipsis -->
+					<button class="join-item btn btn-disabled" disabled aria-label="More pages">
+						<span aria-hidden="true">...</span>
+					</button>
+				} else if pageNum == props.Pagination.CurrentPage {
+					<!-- Current Page -->
+					<button class="join-item btn btn-active" aria-current="page" aria-label={ fmt.Sprintf("Page %d, current page", pageNum) }>
+						{ fmt.Sprintf("%d", pageNum) }
+					</button>
+				} else {
+					<!-- Other Pages -->
+					<button
+						class="join-item btn"
+						hx-get={ models.BuildPageURL(props.BaseURL, pageNum) }
+						hx-target="#feed-list"
+						hx-include={ props.FormID }
+						aria-label={ fmt.Sprintf("Go to page %d", pageNum) }
+					>
+						{ fmt.Sprintf("%d", pageNum) }
+					</button>
+				}
+			}
+			<!-- Next Button -->
+			if props.Pagination.HasNext {
+				<button
+					class="join-item btn"
+					hx-get={ models.BuildPageURL(props.BaseURL, props.Pagination.CurrentPage+1) }
+					hx-target="#feed-list"
+					hx-include={ props.FormID }
+					aria-label={ fmt.Sprintf("Go to next page %d", props.Pagination.CurrentPage+1) }
+				>
+					<span aria-hidden="true">»</span>
+				</button>
+			} else {
+				<button class="join-item btn btn-disabled" disabled aria-label="Next page unavailable">
+					<span aria-hidden="true">»</span>
+				</button>
+			}
+		</div>
+	</nav>
 }

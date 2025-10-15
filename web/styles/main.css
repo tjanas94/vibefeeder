@@ -5,3 +5,14 @@
     winter --default,
     night --prefersdark;
 }
+
+@layer utilities {
+  /* HTMX loading states */
+  .htmx-indicator {
+    display: none;
+  }
+
+  .htmx-request .htmx-indicator {
+    display: inline-block;
+  }
+}

@@ -53,9 +53,6 @@ type ModalProps struct {
 	// ContentID is the unique HTML id for the content container inside the modal
 	ContentID string
 
-	// Title is the modal header text
-	Title string
-
 	// AlpineStateVar is the Alpine.js variable name controlling modal visibility
 	// Example: "isSummaryModalOpen"
 	AlpineStateVar string
@@ -68,9 +65,6 @@ type ModalProps struct {
 type AlertProps struct {
 	// Type of alert: "error", "success", "warning", "info" (default: "info")
 	Type string
-
-	// Message is the alert text to display
-	Message string
 
 	// ShowIcon determines whether to show an icon (default: true)
 	ShowIcon bool
@@ -87,4 +81,68 @@ type NavbarProps struct {
 	// UserEmail is the email address of the authenticated user
 	// Displayed in the navbar for user identification
 	UserEmail string
+}
+
+// ToastProps defines configuration for the Toast notification component.
+type ToastProps struct {
+	// Type of toast: "error", "success", "warning", "info" (default: "info")
+	Type string
+
+	// Message is the toast text to display
+	Message string
+
+	// Duration is the time in milliseconds before auto-dismiss (default: 3000)
+	// Set to 0 to use default duration
+	Duration int
+
+	// UseOOB determines whether to use hx-swap-oob for out-of-band updates
+	// When true, toast will be injected into #toast-container
+	UseOOB bool
+}
+
+// BadgeProps defines configuration for the Badge component.
+// Badge renders a small label with colored background to indicate status or category.
+type BadgeProps struct {
+	// Text is the badge text to display
+	Text string
+
+	// Type of badge: "success", "error", "warning", "info", "neutral" (default: "neutral")
+	Type string
+
+	// Size of badge: "sm", "md", "lg" (default: "md")
+	Size string
+
+	// Icon is optional icon (emoji or SVG) to display before text
+	Icon string
+
+	// Tooltip is optional tooltip text for the badge
+	Tooltip string
+}
+
+// FormFieldProps defines configuration for the FormField component.
+// FormField renders a simple form input field with label and error display.
+type FormFieldProps struct {
+	// Label is the text for the input label
+	Label string
+
+	// ID is the HTML id attribute for the input (used in label's for attribute)
+	ID string
+
+	// Name is the HTML name attribute for the input
+	Name string
+
+	// Type is the input type: "text", "url", "email", "password" (default: "text")
+	Type string
+
+	// Value is the current value of the input
+	Value string
+
+	// Placeholder is the placeholder text for the input
+	Placeholder string
+
+	// Error is the validation error message to display
+	Error string
+
+	// Required indicates if the field is required (shows * in label and adds required attribute)
+	Required bool
 }

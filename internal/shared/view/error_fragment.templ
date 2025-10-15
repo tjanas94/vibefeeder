@@ -7,8 +7,9 @@ import "github.com/tjanas94/vibefeeder/internal/shared/view/components"
 templ ErrorFragment(props ErrorFragmentProps) {
 	@components.Alert(components.AlertProps{
 		Type:     "error",
-		Message:  props.Message,
 		ShowIcon: true,
 		UseOOB:   true,
-	})
+	}) {
+		{ props.Message }
+	}
 }

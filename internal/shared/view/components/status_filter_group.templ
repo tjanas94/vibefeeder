@@ -1,0 +1,31 @@
+package components
+
+// StatusFilterGroupProps defines properties for the status filter button group
+type StatusFilterGroupProps struct {
+	Name          string   // Name attribute for the radio group
+	Options       []string // List of status values: "all", "working", "pending", "error"
+	SelectedValue string   // Currently selected value (from query params)
+}
+
+// statusLabels maps status values to their display labels
+var statusLabels = map[string]string{
+	"all":     "All",
+	"working": "Working",
+	"pending": "Pending",
+	"error":   "With errors",
+}
+
+// StatusFilterGroup renders a group of radio buttons styled as a button group
+// Uses DaisyUI's join component for the button group styling
+templ StatusFilterGroup(props StatusFilterGroupProps) {
+	<div class="join" role="radiogroup" aria-label="Filter by status">
+		for _, option := range props.Options {
+			@StatusFilterButton(StatusFilterButtonProps{
+				Name:    props.Name,
+				Value:   option,
+				Label:   statusLabels[option],
+				Checked: props.SelectedValue == option,
+			})
+		}
+	</div>
+}

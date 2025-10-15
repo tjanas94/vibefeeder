@@ -15,8 +15,25 @@ templ Layout(props LayoutProps) {
 			<meta name="htmx-config" content='{"responseHandling":[{"code":"204", "swap": false},{"code":"[23]..", "swap": true},{"code":"[45]..", "swap": true, "error":true},{"code":"...", "swap": false}]}'/>
 		</head>
 		<body class="min-h-screen bg-base-100">
+			<a href="#main-content" class="skip-link absolute left-[-999px] focus:left-4 top-4 bg-base-200 px-4 py-2 rounded shadow z-[100]">
+				Pomiń nawigację
+			</a>
 			<!-- Global HTMX Error Container -->
-			<div id="global-errors" class="fixed top-4 right-4 z-50 space-y-2 max-w-md"></div>
+			<div
+				id="global-errors"
+				class="fixed top-4 right-4 z-50 space-y-2 max-w-md"
+				role="alert"
+				aria-live="assertive"
+				aria-atomic="true"
+			></div>
+			<!-- Toast Notifications Container -->
+			<div
+				id="toast-container"
+				class="toast toast-top toast-end z-50"
+				role="status"
+				aria-live="polite"
+				aria-atomic="false"
+			></div>
 			{ children... }
 		</body>
 	</html>

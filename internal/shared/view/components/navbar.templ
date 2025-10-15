@@ -1,5 +1,7 @@
 package components
 
+import "fmt"
+
 // Navbar renders the top navigation bar for authenticated users.
 // This component accepts custom navigation items via children slot.
 //
@@ -10,23 +12,21 @@ package components
 //       <button class="btn btn-ghost" @click="...">Custom Button</button>
 //   }
 templ Navbar(props NavbarProps) {
-	<div class="navbar bg-base-200 shadow-lg">
+	<nav class="navbar bg-base-200 shadow-lg" aria-label="Main navigation">
 		<div class="navbar-start gap-2">
-			<a href="/dashboard" class="btn btn-ghost text-xl font-bold">VibeFeeder</a>
+			<a href="/dashboard" class="btn btn-ghost text-xl font-bold" aria-label="VibeFeeder - home page">VibeFeeder</a>
 			{ children... }
 		</div>
-		<div class="navbar-center">
-			<!-- Reserved for future navigation items -->
-		</div>
 		<div class="navbar-end gap-2">
-			<div class="text-sm font-medium">{ props.UserEmail }</div>
+			<div class="text-sm font-medium" aria-label={ fmt.Sprintf("Logged in as %s", props.UserEmail) }>{ props.UserEmail }</div>
 			<button
 				class="btn btn-ghost btn-sm hover:btn-neutral"
 				hx-post="/auth/logout"
 				hx-trigger="click"
+				aria-label="Log out of the application"
 			>
-				Wyloguj
+				Log out
 			</button>
 		</div>
-	</div>
+	</nav>
 }

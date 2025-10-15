@@ -14,40 +14,59 @@ templ Index(vm models.DashboardViewModel) {
 		<!-- Dashboard container with Alpine.js state for modals and filters -->
 		<div
 			x-data="{
-				isSummaryModalOpen: false,
-				isFeedModalOpen: false,
-				isDeleteModalOpen: false,
-				search: new URL(window.location.href).searchParams.get('search') || '',
-				status: new URL(window.location.href).searchParams.get('status') || 'all'
+				openModal: null,
+				hasFeeds: false,
+				lastFocusedElement: null
 			}"
-			@close-modals.window="isSummaryModalOpen = false; isFeedModalOpen = false; isDeleteModalOpen = false"
+			@close-modal.window="openModal = null; if(lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; }"
+			@open-modal.window="openModal = $event.detail.modal"
+			@feeds-loaded.window="hasFeeds = $event.detail.hasFeeds"
 		>
 			<!-- Navbar with custom dashboard buttons -->
 			@components.Navbar(components.NavbarProps{
 				UserEmail: vm.UserEmail,
 			}) {
+				<!-- Disabled button with tooltip when no feeds -->
+				<template x-if="!hasFeeds">
+					@components.Tooltip(components.TooltipProps{
+						Text:     "Add at least one feed to generate a summary",
+						Position: "bottom",
+					}) {
+						<button class="btn btn-ghost hover:btn-neutral" disabled>
+							Summary
+						</button>
+					}
+				</template>
+				<!-- Active button when feeds exist -->
 				<button
+					x-show="hasFeeds"
 					class="btn btn-ghost hover:btn-neutral"
-					@click="isSummaryModalOpen = true"
+					@click="lastFocusedElement = $event.target"
 					hx-get="/summaries/latest"
 					hx-target="#summary-modal-content"
 					hx-trigger="click"
 				>
-					Podsumowanie
+					Summary
 				</button>
 			}
 			<!-- Main content area -->
-			<main class="container mx-auto px-4 py-8 max-w-7xl">
+			<main id="main-content" class="container mx-auto px-4 py-8 max-w-7xl">
+				<h1 tabindex="-1" class="text-2xl font-bold mb-6">Dashboard</h1>
 				<div class="space-y-6">
 					<!-- Search and Filter Bar (stays here, not re-rendered by htmx) -->
-					@feedview.FeedSearchFilter()
+					@feedview.FeedSearchFilter(feedview.FeedSearchFilterProps{
+						Search: vm.Query.Search,
+						Status: vm.Query.Status,
+					})
+					<!-- Status announcements for screen readers -->
+					<div id="feed-results-status" class="sr-only" aria-live="polite"></div>
 					<!-- Feed list container (updated by htmx) -->
 					<div
 						id="feed-list"
 						class="min-h-[200px]"
 						hx-get="/feeds"
-						hx-trigger="load"
-						hx-vals="js:{search: new URL(window.location.href).searchParams.get('search') || '', status: new URL(window.location.href).searchParams.get('status') || ''}"
+						hx-trigger="load, refreshFeedList from:document"
+						hx-include="#feed-filter-form"
 					>
 						<!-- Loading spinner shown while feed list loads -->
 						@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
@@ -58,8 +77,7 @@ templ Index(vm models.DashboardViewModel) {
 			@components.Modal(components.ModalProps{
 				ID:             "summary-modal",
 				ContentID:      "summary-modal-content",
-				Title:          "Najnowsze podsumowanie",
-				AlpineStateVar: "isSummaryModalOpen",
+				AlpineStateVar: "openModal === 'summary'",
 				MaxWidth:       "4xl",
 			}) {
 				<!-- Content loaded via htmx from navbar button -->
@@ -69,8 +87,7 @@ templ Index(vm models.DashboardViewModel) {
 			@components.Modal(components.ModalProps{
 				ID:             "feed-form-modal",
 				ContentID:      "feed-form-modal-content",
-				Title:          "Feed",
-				AlpineStateVar: "isFeedModalOpen",
+				AlpineStateVar: "openModal === 'feed'",
 				MaxWidth:       "2xl",
 			}) {
 				<!-- Content loaded via htmx (add/edit form) -->
@@ -80,20 +97,34 @@ templ Index(vm models.DashboardViewModel) {
 			@components.Modal(components.ModalProps{
 				ID:             "delete-confirmation-modal",
 				ContentID:      "delete-confirmation-modal-content",
-				Title:          "Potwierdź usunięcie",
-				AlpineStateVar: "isDeleteModalOpen",
+				AlpineStateVar: "openModal === 'delete'",
 				MaxWidth:       "md",
 			}) {
-				<!-- TODO: Implement delete confirmation dialog with:
-				     - Feed name display
-				     - Warning message "Ta operacja jest nieodwracalna"
-				     - Two buttons: "Anuluj" (btn-ghost) and "Usuń" (btn-error)
-				     - htmx delete request to /feeds/{id} endpoint
-				     - Close modal on cancel or after successful delete -->
-				<div class="p-4 text-center text-base-content/70">
-					Implementacja w trakcie
-				</div>
+				<!-- Content loaded via htmx from delete button -->
+				@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
 			}
 		</div>
+		<script>
+			// Focus management for modals after htmx loads content
+			document.body.addEventListener("htmx:afterSwap", (event) => {
+				const { target, requestConfig } = event.detail;
+				if (requestConfig.verb !== "get") return;
+
+				const focusMap = {
+					"feed-form-modal-content": "#feed-name",
+					"delete-confirmation-modal-content": "#delete-confirmation-modal-content .btn-ghost",
+				};
+
+				const selector = focusMap[target.id];
+				if (selector) {
+					setTimeout(() => {
+						const element = document.querySelector(selector);
+						if (element) {
+							element.focus();
+						}
+					}, 50);
+				}
+			});
+		</script>
 	}
 }

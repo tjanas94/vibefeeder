@@ -9,37 +9,52 @@ import (
 // List renders the feed list results (without search filter).
 // Search filter is in dashboard/view/index.templ to prevent re-rendering and focus loss.
 templ List(vm models.FeedListViewModel) {
-	<!-- Conditional rendering: Empty state, No results, or Feed list -->
-	if vm.ShowEmptyState {
-		@components.EmptyState(components.EmptyStateProps{
-			Icon:        "📡",
-			Title:       "Nie masz jeszcze żadnych feedów",
-			Description: "Dodaj swój pierwszy feed RSS, aby zacząć czytać artykuły",
-			ActionText:  "Dodaj pierwszy feed",
-			ActionAttrs: templ.Attributes{
-				"@click":     "isFeedModalOpen = true",
-				"hx-get":     "/feeds/new",
-				"hx-target":  "#feed-form-modal-content",
-				"hx-trigger": "click",
-			},
-		})
+	<!-- Conditional rendering: Error state, Empty state, No results, or Feed list -->
+	if vm.ErrorMessage != "" {
+		<div role="alert" aria-live="assertive">
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:        "⚠️",
+				Title:       "Failed to load feeds",
+				Description: vm.ErrorMessage,
+			})
+		</div>
+	} else if vm.ShowEmptyState {
+		<div role="status" aria-live="polite">
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:        "📡",
+				Title:       "You don't have any feeds yet",
+				Description: "Add your first RSS feed to start reading articles",
+				ActionText:  "Add first feed",
+				ActionAttrs: templ.Attributes{
+					"@click":     "lastFocusedElement = $event.target",
+					"hx-get":     "/feeds/new",
+					"hx-target":  "#feed-form-modal-content",
+					"hx-trigger": "click",
+				},
+			})
+		</div>
 	} else if len(vm.Feeds) == 0 {
 		<!-- No results found after filtering -->
-		<div class="text-center py-12">
-			<div class="text-6xl mb-4">🔍</div>
-			<h3 class="text-xl font-semibold mb-2">Nie znaleziono feedów</h3>
-			<p class="text-base-content/70">Spróbuj zmienić kryteria wyszukiwania lub filtry</p>
+		<div role="status" aria-live="polite">
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:        "🔍",
+				Title:       "No feeds found",
+				Description: "Try adjusting your search or filters",
+			})
 		</div>
 	} else {
 		<!-- Feed List Table -->
 		<div class="overflow-x-auto">
-			<table class="table table-zebra w-full">
+			<table class="table table-zebra w-full" aria-label="RSS feed list">
+				<caption class="sr-only">
+					RSS feed list with edit and delete actions
+				</caption>
 				<thead>
 					<tr>
-						<th>Nazwa</th>
-						<th>URL</th>
-						<th>Status</th>
-						<th class="text-right">Akcje</th>
+						<th scope="col">Name</th>
+						<th scope="col">URL</th>
+						<th scope="col">Status</th>
+						<th scope="col" class="text-right">Actions</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -51,73 +66,62 @@ templ List(vm models.FeedListViewModel) {
 		</div>
 		<!-- Pagination -->
 		if vm.Pagination.TotalPages > 1 {
-			<div class="flex justify-center mt-6">
-				@components.Pagination(components.PaginationProps{
-					Pagination: vm.Pagination,
-					BaseURL:    "/feeds",
-					FormID:     "#feed-filter-form",
-				})
-			</div>
+			@components.Pagination(components.PaginationProps{
+				Pagination: vm.Pagination,
+				BaseURL:    "/feeds",
+				FormID:     "#feed-filter-form",
+			})
 		}
 	}
 }
 
+// FeedSearchFilterProps defines properties for the feed search filter
+type FeedSearchFilterProps struct {
+	Search string // Initial search value from query params
+	Status string // Initial status filter value from query params
+}
+
 // FeedSearchFilter renders the search input and status filter buttons.
-// Uses Alpine state (search, status) from parent dashboard container.
-templ FeedSearchFilter() {
+// Uses native form values - no Alpine state needed, htmx serializes the form.
+templ FeedSearchFilter(props FeedSearchFilterProps) {
 	<form
 		id="feed-filter-form"
 		class="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center"
 		hx-get="/feeds"
 		hx-target="#feed-list"
-		hx-trigger="change from:input[type=radio], keyup changed delay:500ms from:input[type=search]"
+		hx-trigger="change from:input[type=radio], keyup changed delay:500ms from:input[type=search], search from:input[type=search]"
+		role="search"
+		aria-label="Search and filter feeds"
 	>
 		<!-- Search Input -->
+		<label for="feed-search" class="sr-only">Search feeds by name</label>
 		<input
+			id="feed-search"
 			type="search"
 			name="search"
-			placeholder="Szukaj po nazwie..."
+			placeholder="Search by name..."
 			class="input input-bordered flex-1"
-			x-model="search"
+			value={ props.Search }
+			aria-label="Search feeds by name"
 		/>
 		<!-- Status Filter Radio Buttons (styled as buttons) -->
-		<div class="join">
-			<input
-				type="radio"
-				name="status"
-				value="all"
-				class="join-item btn btn-neutral checked:btn-secondary"
-				aria-label="Wszystkie"
-				x-model="status"
-			/>
-			<input
-				type="radio"
-				name="status"
-				value="working"
-				class="join-item btn btn-neutral checked:btn-secondary"
-				aria-label="Działające"
-				x-model="status"
-			/>
-			<input
-				type="radio"
-				name="status"
-				value="error"
-				class="join-item btn btn-neutral checked:btn-secondary"
-				aria-label="Z błędami"
-				x-model="status"
-			/>
-		</div>
+		@components.StatusFilterGroup(components.StatusFilterGroupProps{
+			Name:          "status",
+			Options:       []string{"all", "working", "pending", "error"},
+			SelectedValue: props.Status,
+		})
 		<!-- Add Feed Button -->
 		<button
 			type="button"
 			class="btn btn-primary"
-			@click="isFeedModalOpen = true"
+			@click="lastFocusedElement = $event.target"
 			hx-get="/feeds/new"
 			hx-target="#feed-form-modal-content"
 			hx-trigger="click"
+			aria-label="Add new RSS feed"
 		>
-			<span class="text-lg">+</span>
-			Dodaj feed
+			<span aria-hidden="true" class="text-lg">+</span>
+			<span>Add feed</span>
 		</button>
 	</form>
 }
@@ -126,49 +130,71 @@ templ FeedSearchFilter() {
 templ FeedListItem(feed models.FeedItemViewModel) {
 	<tr>
 		<!-- Feed Name -->
-		<td class="font-medium">{ feed.Name }</td>
+		<th scope="row" class="font-medium">{ feed.Name }</th>
 		<!-- Feed URL -->
 		<td class="text-sm text-base-content/70 max-w-md truncate">
-			{ feed.URL }
+			<span title={ feed.URL }>{ feed.URL }</span>
 		</td>
 		<!-- Status with Error Tooltip -->
 		<td>
 			if feed.HasError {
-				<div class="tooltip tooltip-top" data-tip={ feed.ErrorMessage }>
-					<span class="badge badge-error gap-2">
-						<span class="text-sm">⚠️</span>
-						Błąd
-					</span>
-				</div>
+				@components.Badge(components.BadgeProps{
+					Text:    "Error",
+					Type:    "error",
+					Icon:    "❌",
+					Tooltip: feed.ErrorMessage,
+				})
+			} else if feed.LastFetchedAt.IsZero() {
+				@components.Badge(components.BadgeProps{
+					Text: "Pending",
+					Type: "warning",
+					Icon: "⏳",
+				})
 			} else {
-				<span class="badge badge-success gap-2">
-					<span class="text-sm">✓</span>
-					OK
-				</span>
+				@components.Badge(components.BadgeProps{
+					Text: "OK",
+					Type: "success",
+					Icon: "✅",
+				})
 			}
 		</td>
 		<!-- Actions -->
 		<td class="text-right">
-			<div class="flex gap-2 justify-end">
+			<div class="flex gap-2 justify-end" role="group" aria-label="Actions for this feed">
 				<!-- Edit Button -->
-				<button
-					type="button"
-					class="btn btn-sm btn-ghost"
-					@click="isFeedModalOpen = true"
-					hx-get={ fmt.Sprintf("/feeds/%s/edit", feed.ID) }
-					hx-target="#feed-form-modal-content"
-					hx-trigger="click"
-				>
-					✏️
-				</button>
+				@components.Tooltip(components.TooltipProps{
+					Text:     "Edit feed",
+					Position: "left",
+				}) {
+					<button
+						type="button"
+						class="btn btn-sm btn-ghost"
+						@click="lastFocusedElement = $event.target"
+						hx-get={ fmt.Sprintf("/feeds/%s/edit", feed.ID) }
+						hx-target="#feed-form-modal-content"
+						hx-trigger="click"
+						aria-label={ fmt.Sprintf("Edit feed %s", feed.Name) }
+					>
+						<span aria-hidden="true">✏️</span>
+					</button>
+				}
 				<!-- Delete Button -->
-				<button
-					type="button"
-					class="btn btn-sm btn-ghost text-error"
-					@click="isDeleteModalOpen = true"
-				>
-					🗑️
-				</button>
+				@components.Tooltip(components.TooltipProps{
+					Text:     "Delete feed",
+					Position: "left",
+				}) {
+					<button
+						type="button"
+						class="btn btn-sm btn-ghost text-error"
+						@click="lastFocusedElement = $event.target"
+						hx-get={ fmt.Sprintf("/feeds/%s/delete", feed.ID) }
+						hx-target="#delete-confirmation-modal-content"
+						hx-trigger="click"
+						aria-label={ fmt.Sprintf("Delete feed %s", feed.Name) }
+					>
+						<span aria-hidden="true">🗑️</span>
+					</button>
+				}
 			</div>
 		</td>
 	</tr>

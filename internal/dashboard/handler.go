@@ -7,8 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/dashboard/models"
 	"github.com/tjanas94/vibefeeder/internal/dashboard/view"
-	"github.com/tjanas94/vibefeeder/internal/shared/auth"
-	sharedview "github.com/tjanas94/vibefeeder/internal/shared/view"
+	feedmodels "github.com/tjanas94/vibefeeder/internal/feed/models"
 )
 
 // Handler handles dashboard requests
@@ -26,36 +25,34 @@ func NewHandler(logger *slog.Logger) *Handler {
 // ShowDashboard renders the main dashboard page
 // Returns empty layout with htmx-enabled containers that load content dynamically
 func (h *Handler) ShowDashboard(c echo.Context) error {
-	// Get user ID from context (set by auth middleware)
-	userID := auth.GetUserID(c)
-
 	// TODO: Fetch actual user data from database when user service is implemented
 	// For now, use mock email based on user ID
 	mockEmail := "user@example.com"
+
+	// Bind and validate query params using the same struct as GET /feeds
+	query := new(feedmodels.ListFeedsQuery)
+	if err := c.Bind(query); err != nil {
+		h.logger.Warn("failed to bind query parameters", "error", err)
+		// Use defaults on binding error
+		query = &feedmodels.ListFeedsQuery{}
+	}
+
+	query.SetDefaults()
+
+	if err := c.Validate(query); err != nil {
+		h.logger.Warn("invalid query parameters", "error", err)
+		// Use defaults on validation error
+		query = &feedmodels.ListFeedsQuery{}
+		query.SetDefaults()
+	}
 
 	// Prepare view model
 	vm := models.DashboardViewModel{
 		Title:     "Dashboard - VibeFeeder",
 		UserEmail: mockEmail,
+		Query:     query,
 	}
 
 	// Render dashboard template
-	if err := c.Render(http.StatusOK, "", view.Index(vm)); err != nil {
-		h.logger.Error("failed to render dashboard",
-			"error", err,
-			"path", c.Request().URL.Path,
-			"user_id", userID,
-		)
-		return c.Render(
-			http.StatusInternalServerError,
-			"",
-			sharedview.ErrorPage(sharedview.ErrorPageProps{
-				Code:    http.StatusInternalServerError,
-				Title:   "Internal Server Error",
-				Message: "Failed to load dashboard. Please refresh the page.",
-			}),
-		)
-	}
-
-	return nil
+	return c.Render(http.StatusOK, "", view.Index(vm))
 }

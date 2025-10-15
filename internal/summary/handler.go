@@ -93,6 +93,7 @@ func (h *Handler) GetLatestSummary(c echo.Context) error {
 		return h.renderError(c, http.StatusInternalServerError, "Failed to load summary")
 	}
 
-	// Success - render display view with view model
+	// Success - add HX-Trigger header to open modal and render display view with view model
+	c.Response().Header().Set("HX-Trigger", `{"openModal": {"modal": "summary"}}`)
 	return c.Render(http.StatusOK, "", view.Display(*vm))
 }

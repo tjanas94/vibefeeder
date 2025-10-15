@@ -1,39 +1,65 @@
 package components
 
-// TODO: Implement Badge component
-//
-// Badge/Status Indicator should render a small label with colored background
-// to indicate status or category.
-//
-// Use cases:
-// 1. Feed status indicator
-//    - Type: "success" -> "Working" (green)
-//    - Type: "error" -> "Error" (red)
-//
-// 2. Generic status badges
-//    - Type: "warning" -> yellow
-//    - Type: "info" -> blue
-//
-// Proposed structure:
-//
-// type BadgeProps struct {
-//     Text string
-//     Type string  // "success", "error", "warning", "info", "neutral"
-//     Size string  // "sm", "md", "lg" (default: "md")
-// }
+// Badge renders a small label with colored background to indicate status or category.
+// Supports optional tooltip, icon, and configurable size.
 //
 // Example usage:
 // @components.Badge(components.BadgeProps{
 //     Text: "Working",
 //     Type: "success",
 //     Size: "sm",
+//     Icon: "✓",
+//     Tooltip: "Feed is working correctly",
 // })
-//
-// Renders:
-// <span class="badge badge-success badge-sm">Working</span>
+templ Badge(props BadgeProps) {
+	if props.Tooltip != "" {
+		@Tooltip(TooltipProps{
+			Text:     props.Tooltip,
+			Position: "top",
+		}) {
+			@badgeContent(props)
+		}
+	} else {
+		@badgeContent(props)
+	}
+}
 
-// Badge is a placeholder component. Implementation pending.
-// TODO: Implement full Badge component based on comments above.
-templ Badge() {
-	<span class="badge">Badge - to be implemented</span>
+// badgeContent renders the actual badge span with appropriate styling
+templ badgeContent(props BadgeProps) {
+	<span class={ "badge", getBadgeTypeClass(props.Type), getBadgeSizeClass(props.Size) }>
+		if props.Icon != "" {
+			<span aria-hidden="true">{ props.Icon }</span>
+		}
+		<span>{ props.Text }</span>
+	</span>
+}
+
+// getBadgeTypeClass returns the appropriate DaisyUI badge class based on type
+func getBadgeTypeClass(badgeType string) string {
+	switch badgeType {
+	case "success":
+		return "badge-success"
+	case "error":
+		return "badge-error"
+	case "warning":
+		return "badge-warning"
+	case "info":
+		return "badge-info"
+	case "neutral":
+		return "badge-neutral"
+	default:
+		return "badge-neutral"
+	}
+}
+
+// getBadgeSizeClass returns the appropriate DaisyUI badge size class
+func getBadgeSizeClass(size string) string {
+	switch size {
+	case "sm":
+		return "badge-sm"
+	case "lg":
+		return "badge-lg"
+	default:
+		return "" // md is default, no class needed
+	}
 }

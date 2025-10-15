@@ -12,6 +12,7 @@ import (
 type FeedListViewModel struct {
 	Feeds          []FeedItemViewModel              `json:"feeds"`
 	ShowEmptyState bool                             `json:"show_empty_state"`
+	ErrorMessage   string                           `json:"error_message,omitempty"`
 	Pagination     sharedmodels.PaginationViewModel `json:"pagination"`
 }
 
@@ -27,13 +28,16 @@ type FeedItemViewModel struct {
 	LastFetchedAt time.Time `json:"last_fetched_at"`
 }
 
-// FeedEditFormViewModel represents the feed edit form data.
-// Derived from database.PublicFeedsSelect (subset of fields).
-// Used by: GET /feeds/{id}/edit
-type FeedEditFormViewModel struct {
-	FeedID string `json:"feed_id"`
-	Name   string `json:"name"`
-	URL    string `json:"url"`
+// FeedFormViewModel represents the unified form for adding or editing feeds.
+// Used by: GET /feeds/new, GET /feeds/{id}/edit
+type FeedFormViewModel struct {
+	Mode         string                 `json:"mode"`           // "add" or "edit"
+	PostURL      string                 `json:"post_url"`       // "/feeds" or "/feeds/{id}"
+	FormTargetID string                 `json:"form_target_id"` // "feed-add-form-errors" or "feed-edit-form-errors-{id}"
+	FeedID       string                 `json:"feed_id"`        // ID of the feed being edited (optional)
+	Name         string                 `json:"name"`           // Current name
+	URL          string                 `json:"url"`            // Current URL
+	Errors       FeedFormErrorViewModel `json:"errors"`         // Validation errors
 }
 
 // FeedFormErrorViewModel represents validation errors for feed forms.
@@ -42,12 +46,6 @@ type FeedFormErrorViewModel struct {
 	NameError    string `json:"name_error,omitempty"`
 	URLError     string `json:"url_error,omitempty"`
 	GeneralError string `json:"general_error,omitempty"`
-}
-
-// FeedListErrorViewModel represents errors during feed list retrieval.
-// Used by: GET /feeds
-type FeedListErrorViewModel struct {
-	ErrorMessage string `json:"error_message"`
 }
 
 // NewFeedItemFromDB creates a FeedItemViewModel from database.PublicFeedsSelect.
@@ -75,15 +73,6 @@ func NewFeedItemFromDB(dbFeed database.PublicFeedsSelect) FeedItemViewModel {
 	return vm
 }
 
-// NewFeedEditFormFromDB creates a FeedEditFormViewModel from database.PublicFeedsSelect.
-func NewFeedEditFormFromDB(dbFeed database.PublicFeedsSelect) FeedEditFormViewModel {
-	return FeedEditFormViewModel{
-		FeedID: dbFeed.Id,
-		Name:   dbFeed.Name,
-		URL:    dbFeed.Url,
-	}
-}
-
 // NewFeedFormErrorFromFieldErrors creates FeedFormErrorViewModel from field error map.
 // Accepts a map of field names to error messages (from validator.ParseFieldErrors).
 // Returns a view model with errors mapped to the appropriate fields.
@@ -104,4 +93,57 @@ func NewFeedFormErrorFromFieldErrors(fieldErrors map[string]string) FeedFormErro
 	}
 
 	return vm
+}
+
+// NewFeedFormForAdd creates a FeedFormViewModel for adding a new feed.
+func NewFeedFormForAdd() FeedFormViewModel {
+	return FeedFormViewModel{
+		Mode:         "add",
+		PostURL:      "/feeds",
+		FormTargetID: "feed-add-form-errors",
+		Errors:       FeedFormErrorViewModel{},
+	}
+}
+
+// NewFeedFormForEdit creates a FeedFormViewModel for editing an existing feed.
+func NewFeedFormForEdit(dbFeed database.PublicFeedsSelect) FeedFormViewModel {
+	return FeedFormViewModel{
+		Mode:         "edit",
+		PostURL:      "/feeds/" + dbFeed.Id,
+		FormTargetID: "feed-edit-form-errors-" + dbFeed.Id,
+		FeedID:       dbFeed.Id,
+		Name:         dbFeed.Name,
+		URL:          dbFeed.Url,
+		Errors:       FeedFormErrorViewModel{},
+	}
+}
+
+// NewFeedFormWithErrors creates a FeedFormViewModel with validation errors.
+// Used to re-render the form after failed validation.
+func NewFeedFormWithErrors(mode, feedID, name, url string, errors FeedFormErrorViewModel) FeedFormViewModel {
+	vm := FeedFormViewModel{
+		Mode:   mode,
+		FeedID: feedID,
+		Name:   name,
+		URL:    url,
+		Errors: errors,
+	}
+
+	if mode == "add" {
+		vm.PostURL = "/feeds"
+		vm.FormTargetID = "feed-add-form-errors"
+	} else {
+		vm.PostURL = "/feeds/" + feedID
+		vm.FormTargetID = "feed-edit-form-errors-" + feedID
+	}
+
+	return vm
+}
+
+// DeleteConfirmationViewModel holds data for the delete confirmation modal.
+// Used by: GET /feeds/{id}/delete
+type DeleteConfirmationViewModel struct {
+	FeedID       string `json:"feed_id"`
+	FeedName     string `json:"feed_name"`
+	ErrorMessage string `json:"error_message,omitempty"`
 }

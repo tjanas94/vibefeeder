@@ -6,7 +6,6 @@ tasks:
     deps:
       - build:js
       - watch:css
-      - watch:templ
       - watch:go
 
   build:
@@ -84,13 +83,11 @@ tasks:
     desc: Watch and build CSS with Tailwind
     cmd: node_modules/.bin/tailwindcss -i web/styles/main.css -o dist/static/css/main.css --watch
 
-  watch:templ:
-    desc: Watch and build templ files
-    cmd: templ generate --watch
-
   watch:go:
     desc: Watch and build Go with Air
-    cmd: air
+    cmds:
+      - pkill -f air || true
+      - air
 
   lint:
     desc: Run all linters

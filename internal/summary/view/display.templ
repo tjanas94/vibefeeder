@@ -7,8 +7,9 @@ import (
 
 // Display renders the summary display component (debug version)
 templ Display(vm models.SummaryDisplayViewModel) {
+	<h3 id="summary-modal-title" class="font-bold text-lg mb-4">Latest summary</h3>
 	<div class="p-4">
-		<h1 class="text-2xl font-bold mb-4">internal/summary/view/display.templ</h1>
+		<h4 class="text-xl font-bold mb-4">internal/summary/view/display.templ (DEBUG)</h4>
 		<pre>{ fmt.Sprintf("%+v", vm) }</pre>
 	</div>
 }

@@ -20,7 +20,13 @@
 
 Main application view with layout, filters, and containers for user/feeds/summary loaded via htmx.
 
-**Query Parameters:** None
+**Query Parameters:**
+
+- `search` (optional): string - Initial search value for feed filters (pre-populates search input)
+- `status` (optional): enum - Initial status filter for feeds. Values: `all`, `working`, `pending`, `error`. Default: `all` (pre-selects status dropdown)
+- `page` (optional): integer - Initial page number for feed list. Default: `1`
+
+Note: These query parameters are used only to pre-populate the filter form values. The actual feed data is loaded via htmx from `/feeds` endpoint.
 
 **Request Formdata:** None (GET request)
 
@@ -28,22 +34,30 @@ Main application view with layout, filters, and containers for user/feeds/summar
 
 ```go
 type DashboardViewModel struct {
-    // Empty - all data loaded via htmx
+    Title     string
+    UserEmail string
+    Query     *feedmodels.ListFeedsQuery // Query params for feed filtering (search, status, page)
 }
 ```
+
+Note: `ListFeedsQuery` contains: `Search`, `Status`, `Page` fields with validation tags and `SetDefaults()` method. Page size is fixed in backend (currently 20).
 
 **Success Response:**
 
 - HTTP 200 OK
 - Renders: Complete dashboard page with:
-  - Empty container `#user-info-container` (loaded by `hx-get="/auth/me" hx-trigger="load"`)
-  - Feed filter form (search and status select)
-  - Feed add form
-  - Empty container `#feed-list-container` (loaded by `hx-get="/feeds" hx-trigger="load"`)
+  - Feed filter form with id `#feed-filters` containing:
+    - Search input (name="search", pre-populated from `vm.Query.Search`)
+    - Status select (name="status", pre-populated from `vm.Query.Status`, default: "all")
+    - Form uses `hx-get="/feeds"` with `hx-target="#feed-list-container"` and `hx-trigger="change, submit"`
+  - Feed add button/form
+  - Empty container `#feed-list-container` with `hx-get="/feeds"` including current filter params from `vm.Query`
   - Empty container `#summary-container` (loaded by `hx-get="/summaries/latest" hx-trigger="load"`)
 
 **Error Responses:**
 
+- 400 Bad Request
+  - Renders: Dashboard with error message "Invalid filter parameters"
 - 401 Unauthorized
   - Header: `Location: /auth/login`
   - Renders: Redirect to login page
@@ -54,11 +68,13 @@ type DashboardViewModel struct {
 
 **htmx Integration:**
 
-- Dashboard renders only layout and filter forms, all content loaded via htmx
-- User info container uses `hx-get="/auth/me"` with `hx-trigger="load"`
-- Feed list container uses `hx-get="/feeds"` with `hx-trigger="load, refreshFeedList from:body"`
+- Dashboard renders layout with filter forms pre-populated from `vm.Query` (ListFeedsQuery)
+- Feed list container uses `hx-get="/feeds"` with `hx-trigger="load, refreshFeedList from:body"` and `hx-include="#feed-filters"`
+- Filter form (#feed-filters) uses `hx-get="/feeds"` to reload feed list on change/submit
 - Summary container uses `hx-get="/summaries/latest"` with `hx-trigger="load"`
-- All feed mutations (POST, DELETE) use `hx-include="#feed-filters"` to preserve filters
+- All feed mutations (POST, DELETE) use `hx-include="#feed-filters"` to preserve current filter state
+- After mutations, server can return `HX-Trigger: refreshFeedList` to reload feed list with current filters
+- Pagination links include current query params: `/feeds?search={Query.Search}&status={Query.Status}&page={N}`
 
 ---
 
@@ -71,14 +87,13 @@ List all feeds for authenticated user (returns HTML partial for htmx).
 **Query Parameters:**
 
 - `search` (optional): string - Case-insensitive search by feed name
-- `status` (optional): enum - Filter by feed status. Values: `all`, `working`, `error`. Default: `all`
+- `status` (optional): enum - Filter by feed status. Values: `all`, `working`, `pending`, `error`. Default: `all`
   - `all` - no filter on status
   - `working` - WHERE `last_fetch_status = 'success'`
+  - `pending` - WHERE `last_fetch_status IS NULL`
   - `error` - WHERE `last_fetch_status IN ('temporary_error', 'permanent_error', 'unauthorized')`
 - `page` (optional): integer - Page number (1-indexed). Default: `1`
-- `limit` (optional): integer - Items per page. Default: `20`, Max: `100`
-
-**Request Formdata:** None (GET request)
+  **Request Formdata:** None (GET request)
 
 **View Model (Templ):**
 

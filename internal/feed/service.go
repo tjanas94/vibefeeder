@@ -86,7 +86,7 @@ func (s *Service) logFeedAddedEvent(ctx context.Context, userID, feedName, feedU
 }
 
 // GetFeedForEdit retrieves a feed for editing
-func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*models.FeedEditFormViewModel, error) {
+func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*models.FeedFormViewModel, error) {
 	// Fetch feed from repository (includes authorization check via user_id)
 	dbFeed, err := s.repo.FindFeedByIDAndUser(ctx, feedID, userID)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*m
 	}
 
 	// Map database model to view model
-	vm := models.NewFeedEditFormFromDB(*dbFeed)
+	vm := models.NewFeedFormForEdit(*dbFeed)
 	return &vm, nil
 }
 
@@ -177,6 +177,6 @@ func buildFeedListViewModel(result *ListFeedsResult, query models.ListFeedsQuery
 	return models.FeedListViewModel{
 		Feeds:          feedItems,
 		ShowEmptyState: showEmptyState,
-		Pagination:     sharedmodels.BuildPagination(result.TotalCount, query.Page, query.Limit),
+		Pagination:     sharedmodels.BuildPagination(result.TotalCount, query.Page, pageSize),
 	}
 }

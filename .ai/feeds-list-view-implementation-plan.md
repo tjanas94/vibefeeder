@@ -20,17 +20,17 @@ list.templ (FeedListViewModel)
 ├── FeedSearchFilter (komponent do filtrowania i wyszukiwania)
 │   ├── Pole wyszukiwania (`<input type="search">`)
 │   ├── Grupa przycisków filtrów statusu (`.btn-group` z Alpine.js)
-│   └── Przycisk "Dodaj feed" (otwiera modal)
+│   └── Przycisk "Add Feed" (otwiera modal)
 │
 ├── (Renderowanie warunkowe)
 │   ├── `shared/view/components/empty_state.templ` (gdy `ShowEmptyState` jest `true`)
-│   ├── Komunikat "Brak wyników" (gdy `len(Feeds) == 0` po filtracji)
+│   ├── Komunikat "No results found" (gdy `len(Feeds) == 0` po filtracji)
 │   └── Tabela/Lista feedów (`<table>` lub `<div>`)
 │       ├── `FeedListItem` (pętla po `Feeds`)
 │       │   ├── Nazwa feedu
 │       │   ├── Ikona błędu z komponentem `tooltip` (gdy `HasError` jest `true`)
-│       │   ├── Przycisk "Edytuj"
-│       │   └── Przycisk "Usuń"
+│       │   ├── Przycisk "Edit"
+│       │   └── Przycisk "Delete"
 │       └── `shared/view/components/pagination.templ` (komponent paginacji)
 ```
 
@@ -40,13 +40,13 @@ list.templ (FeedListViewModel)
 
 - **Opis:** Pasek narzędziowy umieszczony nad listą feedów, zawierający kontrolki do interakcji z listą.
 - **Główne elementy:**
-  - `input[type="search"]` do wyszukiwania po nazwie.
-  - `div.btn-group` z trzema przyciskami (`button`) do filtrowania po statusie: "Wszystkie", "Działające", "Z błędami".
-  - `button` "Dodaj feed", który inicjuje żądanie htmx w celu otwarcia modala z formularzem.
+  - `input[type="search"]` do wyszukiwania po nazwie (placeholder: "Search feeds...").
+  - `div.btn-group` z czterema przyciskami (`button`) do filtrowania po statusie: "All", "Active", "Pending", "Error".
+  - `button` "Add Feed", który inicjuje żądanie htmx w celu otwarcia modala z formularzem.
 - **Obsługiwane interakcje:**
   - Wpisywanie tekstu w polu wyszukiwania (`hx-trigger="keyup changed delay:500ms"`).
   - Kliknięcie na przyciski filtrów (`hx-trigger="click"`).
-  - Kliknięcie przycisku "Dodaj feed".
+  - Kliknięcie przycisku "Add Feed".
 - **Warunki walidacji:** Brak po stronie klienta.
 - **Typy:** Brak; stan kontrolek jest mapowany bezpośrednio na parametry zapytania `GET /feeds`.
 - **Propsy:** Brak.
@@ -57,10 +57,10 @@ list.templ (FeedListViewModel)
 - **Główne elementy:**
   - Nazwa feedu.
   - Komponent `tooltip` (DaisyUI) z ikoną błędu, wyświetlany warunkowo.
-  - Przyciski "Edytuj" i "Usuń".
+  - Przyciski "Edit" i "Delete".
 - **Obsługiwane interakcje:**
-  - Kliknięcie "Edytuj" (`hx-get="/feeds/{id}/edit"`) ładuje formularz edycji do modala.
-  - Kliknięcie "Usuń" (`hx-delete="/feeds/{id}"`) inicjuje proces usuwania (z potwierdzeniem).
+  - Kliknięcie "Edit" (`hx-get="/feeds/{id}/edit"`) ładuje formularz edycji do modala.
+  - Kliknięcie "Delete" (`hx-delete="/feeds/{id}"`) inicjuje proces usuwania (z potwierdzeniem).
 - **Warunki walidacji:** Brak.
 - **Typy:** `FeedItemViewModel`.
 - **Propsy:** `Feed (FeedItemViewModel)`.
@@ -68,7 +68,7 @@ list.templ (FeedListViewModel)
 ### `Pagination`
 
 - **Opis:** Komponent do nawigacji między stronami listy.
-- **Główne elementy:** Przyciski "Poprzednia", "Następna" oraz numery stron.
+- **Główne elementy:** Przyciski "Previous", "Next" oraz numery stron.
 - **Obsługiwane interakcje:** Kliknięcie na link/przycisk strony (`hx-get` do odpowiedniej strony).
 - **Warunki walidacji:** Brak (linki są generowane na serwerze).
 - **Typy:** `sharedmodels.PaginationViewModel`.
@@ -99,7 +99,7 @@ list.templ (FeedListViewModel)
     <div
       x-data="{ activeFilter: new URL(window.location.href).searchParams.get('status') || 'all' }"
     >
-      <button :class="{ 'btn-active': activeFilter === 'all' }" ...>Wszystkie</button>
+      <button :class="{ 'btn-active': activeFilter === 'all' }" ...>All</button>
       ...
     </div>
     ```
@@ -110,7 +110,7 @@ list.templ (FeedListViewModel)
 - **Endpoint:** `GET /feeds`
 - **Żądanie:**
   - **Metoda:** `GET`
-  - **Parametry:** `search` (string), `status` (enum), `page` (int), `limit` (int).
+  - **Parametry:** `search` (string), `status` (enum), `page` (int).
   - **Wyzwalacze (Triggers):**
     - Wyszukiwanie: `hx-trigger="keyup changed delay:500ms"` na polu `<input>`.
     - Filtrowanie: `hx-trigger="click"` na przyciskach statusu.
@@ -140,9 +140,9 @@ Interfejs użytkownika jest zaprojektowany tak, aby uniemożliwić wysyłanie ni
 
 ## 10. Obsługa błędów
 
-- **Błędy serwera (4xx, 5xx):** Serwer powinien zwrócić fragment HTML z komunikatem o błędzie (np. "Nie udało się załadować feedów"). htmx automatycznie umieści ten fragment w kontenerze docelowym. Warto dodać przycisk "Spróbuj ponownie", który ponowi ostatnie żądanie.
+- **Błędy serwera (4xx, 5xx):** Serwer powinien zwrócić fragment HTML z komunikatem o błędzie (np. "Failed to load feeds"). htmx automatycznie umieści ten fragment w kontenerze docelowym. Warto dodać przycisk "Try Again", który ponowi ostatnie żądanie.
 - **Błędy sieciowe:** Globalna obsługa zdarzeń htmx (np. `htmx:sendError`) może być użyta do wyświetlania generycznego komunikatu (np. toast) o problemach z połączeniem.
-- **Brak wyników:** Jeśli API zwraca pustą listę `Feeds` (ale nie `ShowEmptyState`), komponent powinien wyświetlić komunikat "Nie znaleziono feedów pasujących do Twoich kryteriów".
+- **Brak wyników:** Jeśli API zwraca pustą listę `Feeds` (ale nie `ShowEmptyState`), komponent powinien wyświetlić komunikat "No feeds found matching your criteria".
 
 ## 11. Kroki implementacji
 
@@ -152,7 +152,7 @@ Interfejs użytkownika jest zaprojektowany tak, aby uniemożliwić wysyłanie ni
     - Dodać pole wyszukiwania z atrybutami `hx-get`, `hx-trigger`, `hx-target`, `hx-push-url`.
     - Dodać grupę przycisków filtrów z logiką Alpine.js do zarządzania klasą `.btn-active` i atrybutami htmx do wysyłania żądań.
 4.  **Implementacja logiki warunkowej:** Dodać bloki `if/else` w szablonie `templ` do obsługi `ShowEmptyState`, braku wyników i wyświetlania listy.
-5.  **Implementacja `FeedListItem`:** W pętli `for` po `Feeds` stworzyć komponent dla pojedynczego elementu, w tym warunkowe renderowanie ikony błędu i tooltipa (DaisyUI). Dodać przyciski "Edytuj" i "Usuń" z odpowiednimi atrybutami `hx-*`.
+5.  **Implementacja `FeedListItem`:** W pętli `for` po `Feeds` stworzyć komponent dla pojedynczego elementu, w tym warunkowe renderowanie ikony błędu i tooltipa (DaisyUI). Dodać przyciski "Edit" i "Delete" z odpowiednimi atrybutami `hx-*`.
 6.  **Integracja `Pagination`:** Dodać komponent paginacji i przekazać do niego `ViewModel.Pagination`. Upewnić się, że linki generowane przez komponent zachowują aktywne filtry.
 7.  **Styling:** Użyć klas Tailwind CSS i komponentów DaisyUI do ostylowania widoku zgodnie z projektem.
 8.  **Testowanie:** Przetestować wszystkie interakcje: wyszukiwanie (w tym debounce), filtrowanie, paginację, działanie linków, obsługę stanów pustych i błędów.

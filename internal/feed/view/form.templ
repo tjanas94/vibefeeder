@@ -1,0 +1,87 @@
+package view
+
+import (
+	"github.com/tjanas94/vibefeeder/internal/feed/models"
+	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
+)
+
+// FeedForm renders the feed add/edit form component.
+// Dynamically generates form attributes based on mode (add/edit).
+// Uses htmx for form submission and Alpine.js for modal management.
+templ FeedForm(vm models.FeedFormViewModel) {
+	<h3 id="feed-form-modal-title" class="font-bold text-lg mb-4">
+		if vm.Mode == "add" {
+			<span>Add new feed</span>
+		} else {
+			<span>Edit feed</span>
+		}
+	</h3>
+	<form
+		hx-post={ vm.PostURL }
+		hx-target="#feed-form-modal-content"
+		hx-swap="innerHTML"
+		class="space-y-4"
+		aria-labelledby="feed-form-modal-title"
+	>
+		<fieldset class="space-y-4">
+			<legend class="sr-only">Feed details</legend>
+			<!-- Name Field -->
+			@components.FormField(components.FormFieldProps{
+				Label:       "Name",
+				ID:          "feed-name",
+				Name:        "name",
+				Type:        "text",
+				Value:       vm.Name,
+				Placeholder: "My favorite blog",
+				Error:       vm.Errors.NameError,
+				Required:    true,
+			})
+			<!-- URL Field -->
+			@components.FormField(components.FormFieldProps{
+				Label:       "URL",
+				ID:          "feed-url",
+				Name:        "url",
+				Type:        "url",
+				Value:       vm.URL,
+				Placeholder: "https://example.com/feed.xml",
+				Error:       vm.Errors.URLError,
+				Required:    true,
+			})
+		</fieldset>
+		<!-- Error Container for form-level errors -->
+		<div
+			id={ vm.FormTargetID }
+			role="alert"
+			aria-live="polite"
+			aria-atomic="true"
+		>
+			if vm.Errors.GeneralError != "" {
+				@components.Alert(components.AlertProps{
+					Type:     "error",
+					ShowIcon: true,
+				}) {
+					vm.Errors.GeneralError
+				}
+			}
+		</div>
+		<!-- Action Buttons -->
+		<footer class="flex gap-2 justify-end">
+			<button
+				type="button"
+				class="btn btn-ghost"
+				@click="window.dispatchEvent(new CustomEvent('close-modal'))"
+				aria-label="Cancel and close the form"
+			>
+				Cancel
+			</button>
+			<button
+				type="submit"
+				class="btn btn-primary min-w-[100px]"
+				aria-label="Save feed"
+			>
+				<span class="htmx-indicator loading loading-spinner loading-sm" aria-hidden="true"></span>
+				<span>Save</span>
+			</button>
+		</footer>
+	</form>
+}

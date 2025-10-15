@@ -28,7 +28,7 @@ type ListFeedsResult struct {
 // ListFeeds retrieves feeds with filtering and pagination
 func (r *Repository) ListFeeds(ctx context.Context, query models.ListFeedsQuery) (*ListFeedsResult, error) {
 	// Calculate offset for pagination
-	offset := (query.Page - 1) * query.Limit
+	offset := (query.Page - 1) * pageSize
 
 	// Build query with exact count
 	feedQuery := r.db.From("feeds").Select("*", "exact", false)
@@ -42,9 +42,14 @@ func (r *Repository) ListFeeds(ctx context.Context, query models.ListFeedsQuery)
 		feedQuery = feedQuery.Ilike("name", fmt.Sprintf("%%%s%%", query.Search))
 	}
 
-	// Apply status filter if needed
-	if statuses, hasFilter := query.GetStatusFilter(); hasFilter {
-		feedQuery = feedQuery.In("last_fetch_status", statuses)
+	// Apply status filter
+	if statusFilter, hasFilter := query.GetStatusFilter(); hasFilter {
+		switch statusFilter.FilterType {
+		case "IN":
+			feedQuery = feedQuery.In(statusFilter.Column, statusFilter.Values)
+		case "IS_NULL":
+			feedQuery = feedQuery.Is(statusFilter.Column, "null")
+		}
 	}
 
 	// Execute query with pagination and ordering
@@ -52,7 +57,7 @@ func (r *Repository) ListFeeds(ctx context.Context, query models.ListFeedsQuery)
 	var feeds []database.PublicFeedsSelect
 	count, err := feedQuery.
 		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
-		Range(offset, offset+query.Limit-1, "").
+		Range(offset, offset+pageSize-1, "").
 		ExecuteTo(&feeds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch feeds: %w", err)

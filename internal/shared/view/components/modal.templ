@@ -3,34 +3,41 @@ package components
 // Modal renders a DaisyUI modal dialog with Alpine.js state management.
 // Provides a reusable structure for all modal dialogs in the application.
 //
+// IMPORTANT: Children content MUST include an element with id="{ID}-title" for accessibility.
+// This ID is used by aria-labelledby to describe the modal to screen readers.
+//
 // Usage:
 //   @components.Modal(components.ModalProps{
 //       ID: "summary-modal",
 //       ContentID: "summary-modal-content",
-//       Title: "Latest Summary",
 //       AlpineStateVar: "isSummaryModalOpen",
 //       MaxWidth: "4xl",
 //   }) {
-//       <!-- Modal content here, or use hx-target="#summary-modal-content" -->
+//       <h3 id="summary-modal-title" class="font-bold text-lg mb-4">Latest Summary</h3>
+//       <!-- Rest of modal content here, or use hx-target="#summary-modal-content" -->
 //   }
 templ Modal(props ModalProps) {
 	<dialog
 		id={ props.ID }
 		class="modal"
 		x-bind:class={ getAlpineModalOpenClass(props.AlpineStateVar) }
-		@keydown.escape={ getAlpineCloseAction(props.AlpineStateVar) }
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby={ props.ID + "-title" }
 	>
 		<div class={ "modal-box", getModalMaxWidthClass(props.MaxWidth) }>
 			<button
 				class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-				@click={ getAlpineCloseAction(props.AlpineStateVar) }
-			>✕</button>
-			<h3 class="font-bold text-lg mb-4">{ props.Title }</h3>
+				@click="window.dispatchEvent(new CustomEvent('close-modal'))"
+				aria-label="Zamknij okno dialogowe"
+			>
+				<span aria-hidden="true">✕</span>
+			</button>
 			<div id={ props.ContentID }>
 				{ children... }
 			</div>
 		</div>
-		<form method="dialog" class="modal-backdrop" @click={ getAlpineCloseAction(props.AlpineStateVar) }>
+		<form method="dialog" class="modal-backdrop" @click="window.dispatchEvent(new CustomEvent('close-modal'))">
 			<button>close</button>
 		</form>
 	</dialog>
@@ -59,9 +66,4 @@ func getModalMaxWidthClass(maxWidth string) string {
 // getAlpineModalOpenClass returns Alpine.js expression for modal-open class
 func getAlpineModalOpenClass(alpineStateVar string) string {
 	return "{ 'modal-open': " + alpineStateVar + " }"
-}
-
-// getAlpineCloseAction returns Alpine.js expression for closing modal
-func getAlpineCloseAction(alpineStateVar string) string {
-	return alpineStateVar + " = false"
 }

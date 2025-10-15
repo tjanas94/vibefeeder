@@ -6,8 +6,9 @@ package components
 // Usage:
 //   @components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
 templ LoadingSpinner(props LoadingSpinnerProps) {
-	<div class="flex justify-center items-center py-12">
-		<span class={ "loading loading-spinner", getSpinnerSizeClass(props.Size) }></span>
+	<div class="flex justify-center items-center py-12" role="status" aria-live="polite" aria-busy="true">
+		<span class={ "loading loading-spinner", getSpinnerSizeClass(props.Size) } aria-hidden="true"></span>
+		<span class="sr-only">Loading...</span>
 	</div>
 }
 

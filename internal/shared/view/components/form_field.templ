@@ -1,64 +1,43 @@
 package components
 
-// TODO: Implement FormField component
-//
-// FormField should render a complete form input with label, input, and error message.
-// Based on DaisyUI form-control component.
-//
-// Use cases:
-// 1. Feed form fields (name, URL)
-// 2. Login/Register forms
-// 3. Search inputs
-// 4. Any form with validation
-//
-// Features:
-// - Label with optional required indicator
-// - Input with various types (text, url, email, password, etc.)
-// - Error message display
-// - Helper text support
-// - Consistent styling across all forms
-//
-// Proposed structure:
-//
-// type FormFieldProps struct {
-//     Label       string
-//     Name        string
-//     Type        string  // "text", "url", "email", "password", "textarea"
-//     Value       string
-//     Placeholder string
-//     Error       string  // validation error message
-//     Helper      string  // helper text below input
-//     Required    bool
-//     Disabled    bool
-//     Rows        int     // for textarea
-// }
-//
-// Example usage:
-// @components.FormField(components.FormFieldProps{
-//     Label: "Feed URL",
-//     Name: "url",
-//     Type: "url",
-//     Value: "https://example.com/feed",
-//     Placeholder: "https://example.com/rss",
-//     Error: "Invalid URL format",
-//     Required: true,
-// })
-//
-// Renders:
-// <label class="form-control w-full">
-//     <div class="label">
-//         <span class="label-text">Feed URL <span class="text-error">*</span></span>
-//     </div>
-//     <input type="url" name="url" value="..." class="input input-bordered input-error" />
-//     <div class="label">
-//         <span class="label-text-alt text-error">Invalid URL format</span>
-//     </div>
-// </label>
+import "fmt"
 
-// FormField is a placeholder component. Implementation pending.
-// TODO: Implement full FormField component based on comments above.
-templ FormField() {
-	<label class="form-control">
-		<input type="text" class="input input-bordered" placeholder="FormField - to be implemented"/>
-	</label>
+// FormField renders a simple form input field with label and error display.
+// Matches the existing form field style used in the project.
+templ FormField(props FormFieldProps) {
+	<div class="form-control w-full">
+		<label class="label" for={ props.ID }>
+			<span class="label-text">
+				{ props.Label }
+				if props.Required {
+					<span class="text-error" aria-label="wymagane">*</span>
+				}
+			</span>
+		</label>
+		<input
+			type={ props.Type }
+			id={ props.ID }
+			name={ props.Name }
+			value={ props.Value }
+			placeholder={ props.Placeholder }
+			class={ "input input-bordered w-full", templ.KV("input-error", props.Error != "") }
+			if props.Required {
+				required
+				aria-required="true"
+			}
+			if props.Error != "" {
+				aria-invalid="true"
+				aria-describedby={ fmt.Sprintf("%s-error", props.ID) }
+			}
+		/>
+		if props.Error != "" {
+			<div
+				id={ fmt.Sprintf("%s-error", props.ID) }
+				class="label"
+				role="alert"
+			>
+				<span class="label-text-alt text-error">{ props.Error }</span>
+			</div>
+		}
+	</div>
 }

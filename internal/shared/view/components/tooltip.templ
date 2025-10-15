@@ -1,28 +1,13 @@
 package components
 
-// TODO: Implement Tooltip component
-//
-// Tooltip should wrap content and show helpful text on hover/focus.
-// Based on DaisyUI tooltip component.
-//
-// Use cases:
-// 1. Error details on feed status icon
-//    - Position: "top"
-//    - Text: "Failed to fetch: Connection timeout"
-//
-// 2. Disabled button explanation
-//    - Position: "bottom"
-//    - Text: "Add at least one feed first"
-//
-// 3. Additional context for icons/actions
-//    - Position: "left" or "right"
-//
-// Proposed structure:
-//
-// type TooltipProps struct {
-//     Text     string
-//     Position string  // "top", "bottom", "left", "right" (default: "top")
-// }
+// TooltipProps defines properties for the tooltip wrapper component
+type TooltipProps struct {
+	Text     string // Tooltip text to display on hover/focus
+	Position string // "top", "bottom", "left", "right" (default: "top")
+}
+
+// Tooltip wraps content and shows helpful text on hover/focus.
+// Based on DaisyUI tooltip component with accessibility support.
 //
 // Example usage:
 // @components.Tooltip(components.TooltipProps{
@@ -31,16 +16,27 @@ package components
 // }) {
 //     <button class="btn btn-circle btn-sm">❌</button>
 // }
-//
-// Renders:
-// <div class="tooltip tooltip-top" data-tip="Failed to fetch: Connection timeout">
-//     <button class="btn btn-circle btn-sm">❌</button>
-// </div>
-
-// Tooltip is a placeholder component. Implementation pending.
-// TODO: Implement full Tooltip component based on comments above.
-templ Tooltip() {
-	<div class="tooltip" data-tip="Tooltip - to be implemented">
+templ Tooltip(props TooltipProps) {
+	<div class={ getTooltipClasses(props.Position) } data-tip={ props.Text } aria-label={ props.Text }>
 		{ children... }
 	</div>
+}
+
+// getTooltipClasses returns the appropriate DaisyUI tooltip classes based on position
+func getTooltipClasses(position string) string {
+	baseClass := "tooltip"
+
+	switch position {
+	case "bottom":
+		return baseClass + " tooltip-bottom"
+	case "left":
+		return baseClass + " tooltip-left"
+	case "right":
+		return baseClass + " tooltip-right"
+	case "top":
+		return baseClass + " tooltip-top"
+	default:
+		// Default to top if no position specified
+		return baseClass + " tooltip-top"
+	}
 }

@@ -7,8 +7,9 @@ import (
 
 // Error renders the summary error component (debug version)
 templ Error(vm models.SummaryErrorViewModel) {
+	<h3 id="summary-modal-title" class="font-bold text-lg mb-4">Summary error</h3>
 	<div class="p-4">
-		<h1 class="text-2xl font-bold mb-4">internal/summary/view/error.templ</h1>
+		<h4 class="text-xl font-bold mb-4">internal/summary/view/error.templ (DEBUG)</h4>
 		<pre>{ fmt.Sprintf("%+v", vm) }</pre>
 	</div>
 }

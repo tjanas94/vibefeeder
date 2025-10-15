@@ -1,6 +1,10 @@
 package models
 
-import "github.com/tjanas94/vibefeeder/internal/shared/database"
+import (
+	"time"
+
+	"github.com/tjanas94/vibefeeder/internal/shared/database"
+)
 
 // CreateFeedCommand represents the input for creating a new feed.
 // Maps to database.PublicFeedsInsert.
@@ -22,7 +26,7 @@ type UpdateFeedCommand struct {
 // UserID must be set separately by the handler from authenticated session.
 // Sets fetch_after to NOW() + 5 minutes to prevent race conditions with background job.
 func (c CreateFeedCommand) ToInsert(userID string) database.PublicFeedsInsert {
-	fetchAfter := "NOW() + INTERVAL '5 minutes'"
+	fetchAfter := time.Now().Add(5 * time.Minute).Format(time.RFC3339)
 
 	return database.PublicFeedsInsert{
 		Name:       c.Name,
@@ -46,7 +50,7 @@ func (c UpdateFeedCommand) ToUpdate() database.PublicFeedsUpdate {
 // ToUpdateWithURLChange converts UpdateFeedCommand to database.PublicFeedsUpdate when URL has changed.
 // Resets fetch-related fields
 func (c UpdateFeedCommand) ToUpdateWithURLChange() database.PublicFeedsUpdate {
-	fetchAfter := "NOW() + INTERVAL '5 minutes'"
+	fetchAfter := time.Now().Add(5 * time.Minute).Format(time.RFC3339)
 
 	return database.PublicFeedsUpdate{
 		Name:            &c.Name,
