@@ -1,0 +1,56 @@
+package components
+
+// SectionLoader renders a loading indicator for content sections.
+// Used for initial content loading, filters, navigation, and modal content.
+// Provides a centered spinner with optional message and minimum height.
+//
+// Usage:
+//   <div id="feed-list" hx-get="/feeds" hx-trigger="load">
+//     @components.SectionLoader(components.SectionLoaderProps{
+//       Message: "Loading feeds...",
+//       MinHeight: "200px",
+//     })
+//   </div>
+templ SectionLoader(props SectionLoaderProps) {
+	<div
+		class={ "flex flex-col justify-center items-center py-12 gap-3", getMinHeightClass(props.MinHeight) }
+		role="status"
+		aria-live="polite"
+		aria-busy="true"
+		style={ getMinHeightStyle(props.MinHeight) }
+	>
+		<span class={ "loading loading-spinner", getSectionLoaderSizeClass(props.Size) } aria-hidden="true"></span>
+		if props.Message != "" {
+			<span class="text-sm text-base-content/70">{ props.Message }</span>
+		} else {
+			<span class="sr-only">Loading...</span>
+		}
+	</div>
+}
+
+// getSectionLoaderSizeClass returns the appropriate DaisyUI size class for section loaders
+func getSectionLoaderSizeClass(size string) string {
+	switch size {
+	case "sm":
+		return "loading-sm"
+	case "md":
+		return "loading-md"
+	case "lg":
+		return "loading-lg"
+	default:
+		return "loading-lg"
+	}
+}
+
+// getMinHeightClass returns empty string (handled by inline style instead)
+func getMinHeightClass(minHeight string) string {
+	return ""
+}
+
+// getMinHeightStyle returns inline style for min-height if provided
+func getMinHeightStyle(minHeight string) string {
+	if minHeight != "" {
+		return "min-height: " + minHeight
+	}
+	return ""
+}

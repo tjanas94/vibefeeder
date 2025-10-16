@@ -21,7 +21,7 @@ templ Toast(props ToastProps) {
 	}
 }
 
-// toastContent renders the actual toast box with appropriate styling
+// toastContent renders the actual toast box with appropriate styling and close button
 templ toastContent(props ToastProps) {
 	<div
 		class={ "alert", getToastTypeClass(props.Type), "shadow-lg" }
@@ -36,7 +36,17 @@ templ toastContent(props ToastProps) {
 		x-transition:leave-end="opacity-0 translate-x-full"
 	>
 		@toastIcon(props.Type)
-		<span>{ props.Message }</span>
+		<span class="flex-1">{ props.Message }</span>
+		<button
+			type="button"
+			class="btn btn-sm btn-ghost btn-circle"
+			@click="show = false"
+			aria-label="Close notification"
+		>
+			<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+			</svg>
+		</button>
 	</div>
 }
 

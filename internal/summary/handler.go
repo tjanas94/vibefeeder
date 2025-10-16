@@ -32,7 +32,11 @@ func (h *Handler) GenerateSummary(c echo.Context) error {
 	userID := auth.GetUserID(c)
 	if userID == "" {
 		h.logger.Error("missing user_id in context")
-		return echo.NewHTTPError(http.StatusUnauthorized, "Authentication required")
+		errVM := &models.SummaryDisplayViewModel{
+			ErrorMessage: "Authentication required",
+			CanGenerate:  false,
+		}
+		return c.Render(http.StatusUnauthorized, "", view.Display(*errVM))
 	}
 
 	// Call service to generate summary and get view model
@@ -41,17 +45,35 @@ func (h *Handler) GenerateSummary(c echo.Context) error {
 	// Domain / expected errors are embedded into the Display view via ErrorMessage
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrNoArticlesFound),
-			errors.Is(err, ErrAIServiceUnavailable):
+		case errors.Is(err, ErrNoArticlesFound):
+			h.logger.Info("no articles found for user", "error", err)
 			errVM := &models.SummaryDisplayViewModel{
 				ErrorMessage: err.Error(),
 				// User has at least one feed if they attempted generation; allow retry button.
 				CanGenerate: true,
 			}
-			return c.Render(http.StatusOK, "", view.Display(*errVM))
+			return c.Render(http.StatusNotFound, "", view.Display(*errVM))
+		case errors.Is(err, ErrAIServiceUnavailable):
+			h.logger.Warn("AI service unavailable", "error", err)
+			errVM := &models.SummaryDisplayViewModel{
+				ErrorMessage: err.Error(),
+				CanGenerate:  true,
+			}
+			return c.Render(http.StatusServiceUnavailable, "", view.Display(*errVM))
+		case errors.Is(err, ErrDatabase):
+			h.logger.Error("database error", "error", err)
+			errVM := &models.SummaryDisplayViewModel{
+				ErrorMessage: err.Error(),
+				CanGenerate:  true,
+			}
+			return c.Render(http.StatusInternalServerError, "", view.Display(*errVM))
 		default:
 			h.logger.Error("unexpected summary generation error", "error", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to process summary request")
+			errVM := &models.SummaryDisplayViewModel{
+				ErrorMessage: "An unexpected error occurred",
+				CanGenerate:  true,
+			}
+			return c.Render(http.StatusInternalServerError, "", view.Display(*errVM))
 		}
 	}
 
@@ -72,16 +94,8 @@ func (h *Handler) GetLatestSummary(c echo.Context) error {
 	// Call service to get latest summary and view model
 	vm, err := h.service.GetLatestSummaryForUser(c.Request().Context(), userID)
 	if err != nil {
-		// Treat load failure as embedded error view instead of global handler
 		h.logger.Error("failed to get latest summary", "user_id", userID, "error", err)
-		errVM := models.SummaryDisplayViewModel{
-			ErrorMessage:   "Failed to load summary",
-			CanGenerate:    false,
-			ShowEmptyState: false,
-		}
-		// Still open modal so user sees the error
-		c.Response().Header().Set("HX-Trigger", `{"openModal": {"modal": "summary"}}`)
-		return c.Render(http.StatusOK, "", view.Display(errVM))
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to load summary")
 	}
 
 	// Success - add HX-Trigger header to open modal and render display view with view model

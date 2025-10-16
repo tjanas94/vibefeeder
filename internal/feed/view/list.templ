@@ -54,7 +54,7 @@ templ List(vm models.FeedListViewModel) {
 						<th scope="col">Name</th>
 						<th scope="col">URL</th>
 						<th scope="col">Status</th>
-						<th scope="col" class="text-right">Actions</th>
+						<th scope="col" class="text-right w-32">Actions</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -80,43 +80,38 @@ templ List(vm models.FeedListViewModel) {
 templ FeedSearchFilter(props FeedSearchFilterProps) {
 	<form
 		id="feed-filter-form"
-		class="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center"
+		class="relative space-y-4"
 		hx-get="/feeds"
 		hx-target="#feed-list"
 		hx-trigger="change from:input[type=radio], keyup changed delay:500ms from:input[type=search], search from:input[type=search]"
 		role="search"
 		aria-label="Search and filter feeds"
 	>
-		<!-- Search Input -->
-		<label for="feed-search" class="sr-only">Search feeds by name</label>
-		<input
-			id="feed-search"
-			type="search"
-			name="search"
-			placeholder="Search by name..."
-			class="input input-bordered flex-1"
-			value={ props.Search }
-			aria-label="Search feeds by name"
-		/>
-		<!-- Status Filter Radio Buttons (styled as buttons) -->
-		@components.StatusFilterGroup(components.StatusFilterGroupProps{
-			Name:          "status",
-			Options:       []string{"all", "working", "pending", "error"},
-			SelectedValue: props.Status,
-		})
-		<!-- Add Feed Button -->
-		<button
-			type="button"
-			class="btn btn-primary"
-			@click="lastFocusedElement = $event.target"
-			hx-get="/feeds/new"
-			hx-target="#feed-form-modal-content"
-			hx-trigger="click"
-			aria-label="Add new RSS feed"
-		>
-			<span aria-hidden="true" class="text-lg">+</span>
-			<span>Add feed</span>
-		</button>
+		<!-- Filter fields wrapper -->
+		<div class="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
+			<!-- Search Input -->
+			<label for="feed-search" class="sr-only">Search feeds by name</label>
+			<input
+				id="feed-search"
+				type="search"
+				name="search"
+				placeholder="Search by name..."
+				class="input input-bordered flex-1"
+				value={ props.Search }
+				aria-label="Search feeds by name"
+			/>
+			<!-- Status Filter Radio Buttons (styled as buttons) -->
+			@components.StatusFilterGroup(components.StatusFilterGroupProps{
+				Name:          "status",
+				Options:       []string{"all", "working", "pending", "error"},
+				SelectedValue: props.Status,
+			})
+		</div>
+		<!-- Loading indicator below filters - absolute positioned to prevent layout shift -->
+		<div class="htmx-indicator absolute left-1/2 -translate-x-1/2 top-[calc(100%+1.5rem)] flex items-center justify-center gap-2">
+			<span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
+			<span class="text-sm font-medium">Loading...</span>
+		</div>
 	</form>
 }
 
@@ -153,7 +148,7 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 			}
 		</td>
 		<!-- Actions -->
-		<td class="text-right">
+		<td class="text-right w-32">
 			<div class="flex gap-2 justify-end" role="group" aria-label="Actions for this feed">
 				<!-- Edit Button -->
 				@components.Tooltip(components.TooltipProps{
@@ -162,13 +157,16 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 				}) {
 					<button
 						type="button"
-						class="btn btn-sm btn-ghost"
+						class="btn btn-sm btn-ghost w-[3.5rem] flex items-center justify-center gap-1 px-2"
 						@click="lastFocusedElement = $event.target"
 						hx-get={ fmt.Sprintf("/feeds/%s/edit", feed.ID) }
 						hx-target="#feed-form-modal-content"
 						hx-trigger="click"
 						aria-label={ fmt.Sprintf("Edit feed %s", feed.Name) }
 					>
+						<span class="w-4 flex justify-center">
+							@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
+						</span>
 						<span aria-hidden="true">✏️</span>
 					</button>
 				}
@@ -179,13 +177,16 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 				}) {
 					<button
 						type="button"
-						class="btn btn-sm btn-ghost text-error"
+						class="btn btn-sm btn-ghost text-error w-[3.5rem] flex items-center justify-center gap-1 px-2"
 						@click="lastFocusedElement = $event.target"
 						hx-get={ fmt.Sprintf("/feeds/%s/delete", feed.ID) }
 						hx-target="#delete-confirmation-modal-content"
 						hx-trigger="click"
 						aria-label={ fmt.Sprintf("Delete feed %s", feed.Name) }
 					>
+						<span class="w-4 flex justify-center">
+							@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
+						</span>
 						<span aria-hidden="true">🗑️</span>
 					</button>
 				}

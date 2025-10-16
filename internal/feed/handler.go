@@ -353,7 +353,12 @@ func (h *Handler) DeleteFeed(c echo.Context) error {
 	userID := auth.GetUserID(c)
 	if userID == "" {
 		h.logger.Error("missing user_id in context")
-		return echo.NewHTTPError(http.StatusUnauthorized, "Authentication required")
+		vm := models.DeleteConfirmationViewModel{
+			FeedID:       c.Param("id"),
+			FeedName:     "",
+			ErrorMessage: "Authentication required",
+		}
+		return c.Render(http.StatusUnauthorized, "", view.DeleteConfirmation(vm))
 	}
 
 	// Get and validate feed ID from path parameter

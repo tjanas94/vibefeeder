@@ -18,9 +18,9 @@ Celem tego punktu końcowego jest pobranie i wyświetlenie najnowszego podsumowa
 - **`models.SummaryDisplayViewModel`**: Główny model widoku używany do przekazania danych do szablonu `templ`.
   ```go
   type SummaryDisplayViewModel struct {
-      Summary        *SummaryViewModel
-      ShowEmptyState bool
-      CanGenerate    bool
+      Summary      *SummaryViewModel
+      CanGenerate  bool
+      ErrorMessage string
   }
   ```
 - **`models.SummaryViewModel`**: Reprezentuje dane pojedynczego podsumowania.
@@ -37,11 +37,11 @@ Celem tego punktu końcowego jest pobranie i wyświetlenie najnowszego podsumowa
 - **Odpowiedź sukcesu (200 OK)**:
   - Zwraca kod stanu `200 OK`.
   - Renderuje komponent `summary.view.Display` z modelem `SummaryDisplayViewModel`.
-    - Jeśli podsumowanie istnieje, `Summary` zawiera jego dane, a `ShowEmptyState` jest `false`.
-    - Jeśli podsumowanie nie istnieje, `Summary` jest `nil`, a `ShowEmptyState` jest `true`.
+    - Jeśli podsumowanie istnieje, `Summary` zawiera jego dane.
+    - Jeśli podsumowanie nie istnieje, `Summary` jest `nil`.
 - **Odpowiedzi błędów**:
   - **`401 Unauthorized`**: Zwracane przez middleware, jeśli użytkownik nie jest uwierzytelniony.
-  - **`500 Internal Server Error`**: Zwracane, gdy wystąpi błąd serwera (np. błąd zapytania do bazy danych). Renderuje komponent `summary.view.Error` z komunikatem "Failed to load summary".
+  - **`500 Internal Server Error`**: Zwracane, gdy wystąpi błąd serwera (np. błąd zapytania do bazy danych). Renderuje komponent `summary.view.Display` z wypełnionym `ErrorMessage`.
 
 ## 5. Przepływ danych
 

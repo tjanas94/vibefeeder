@@ -18,7 +18,7 @@ templ NavbarButton() {
 				aria-disabled="true"
 				aria-label="Summary (disabled – add at least one feed to enable)"
 			>
-				Summary
+				<span>★ Summary</span>
 			</button>
 		}
 	</template>
@@ -32,6 +32,7 @@ templ NavbarButton() {
 		hx-trigger="click"
 		aria-label="View latest AI summary"
 	>
-		Summary
+		@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
+		<span>★ Summary</span>
 	</button>
 }

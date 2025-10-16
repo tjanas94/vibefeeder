@@ -31,7 +31,23 @@ templ Index(vm models.DashboardViewModel) {
 			}
 			<!-- Main content area -->
 			<main id="main-content" class="container mx-auto px-4 py-8 max-w-7xl">
-				<h1 tabindex="-1" class="text-2xl font-bold mb-6">Dashboard</h1>
+				<!-- Header with Add Feed button -->
+				<div class="flex items-center justify-between mb-6">
+					<h1 tabindex="-1" class="text-2xl font-bold">Dashboard</h1>
+					<button
+						type="button"
+						class="btn btn-primary inline-flex items-center gap-2"
+						@click="lastFocusedElement = $event.target"
+						hx-get="/feeds/new"
+						hx-target="#feed-form-modal-content"
+						hx-trigger="click"
+						aria-label="Add new RSS feed"
+					>
+						@components.ButtonLoader(components.ButtonLoaderProps{})
+						<span aria-hidden="true" class="text-lg">+</span>
+						<span>Add feed</span>
+					</button>
+				</div>
 				<div class="space-y-6">
 					<!-- Search and Filter Bar (stays here, not re-rendered by htmx) -->
 					@feedview.FeedSearchFilter(feedview.FeedSearchFilterProps{
@@ -48,7 +64,10 @@ templ Index(vm models.DashboardViewModel) {
 						hx-trigger="load, refreshFeedList from:document"
 						hx-include="#feed-filter-form"
 					>
-						@components.LoadingSpinner(components.LoadingSpinnerProps{Size: "lg"})
+						@components.SectionLoader(components.SectionLoaderProps{
+							Message:   "Loading feeds...",
+							MinHeight: "200px",
+						})
 					</div>
 				</div>
 			</main>
@@ -86,6 +105,7 @@ templ Index(vm models.DashboardViewModel) {
 				const focusMap = {
 					"feed-form-modal-content": "#feed-name",
 					"delete-confirmation-modal-content": "#delete-confirmation-modal-content .btn-ghost",
+					"summary-modal-content": "#summary-modal-title",
 				};
 
 				const selector = target && focusMap[target.id];

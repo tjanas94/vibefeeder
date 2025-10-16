@@ -14,14 +14,39 @@ import (
 // Display (normal flow) or Error (domain failure) directly.
 
 // =======================
+// Generate Summary Action
+// =======================
+//
+// Renders a form with submit button and loader for generating summaries.
+// Reusable across Content, EmptyState, and Error states.
+templ GenerateSummaryAction(props GenerateSummaryActionProps) {
+	<form
+		hx-post="/summaries"
+		hx-target="#summary-modal-content"
+		hx-swap="innerHTML"
+		class="inline-flex items-center gap-2 min-h-[2.75rem]"
+	>
+		<button
+			type="submit"
+			class={ "btn btn-primary hide-during-request", props.ButtonSize }
+			aria-label={ props.AriaLabel }
+		>
+			{ props.ButtonText }
+		</button>
+		@components.ReplaceLoader(components.ReplaceLoaderProps{
+			Message: "Generating your summary...",
+		})
+	</form>
+}
+
+// =======================
 // Display Orchestrator
 // =======================
 //
 // Decides which state to render based on the SummaryDisplayViewModel.
 // Priority:
 // 1. If Summary present -> Content
-// 2. Else if ShowEmptyState -> EmptyState
-// 3. Fallback -> EmptyState (defensive)
+// 2. Else -> EmptyState
 templ Display(vm models.SummaryDisplayViewModel) {
 	<!-- Root container for summary display -->
 	<section
@@ -29,25 +54,19 @@ templ Display(vm models.SummaryDisplayViewModel) {
 		aria-live="polite"
 		class="space-y-4"
 	>
-		<h3 id="summary-modal-title" class="font-bold text-xl">
+		<h3 id="summary-modal-title" tabindex="-1" class="font-bold text-xl">
 			Daily Summary
 		</h3>
-		<form
-			hx-post="/summaries"
-			hx-target="#summary-modal-content"
-			hx-swap="innerHTML"
-			class="space-y-4"
-		>
-			if vm.ErrorMessage != "" {
-				@Error(models.SummaryErrorViewModel{ErrorMessage: vm.ErrorMessage})
-			} else if vm.Summary != nil {
-				@Content(*vm.Summary, vm.CanGenerate)
-			} else if vm.ShowEmptyState {
-				@EmptyState(vm.CanGenerate)
-			} else {
-				@EmptyState(vm.CanGenerate)
-			}
-		</form>
+		if vm.ErrorMessage != "" {
+			@Error(models.SummaryErrorViewModel{ErrorMessage: vm.ErrorMessage})
+		} else if vm.Summary != nil {
+			@Content(ContentProps{
+				Summary:     *vm.Summary,
+				CanGenerate: vm.CanGenerate,
+			})
+		} else {
+			@EmptyState(EmptyStateProps{CanGenerate: vm.CanGenerate})
+		}
 	</section>
 }
 
@@ -57,34 +76,29 @@ templ Display(vm models.SummaryDisplayViewModel) {
 //
 // Renders the existing summary content and metadata.
 // Shows "Generate New Summary" if the user can generate another summary.
-templ Content(summary models.SummaryViewModel, canGenerate bool) {
+templ Content(props ContentProps) {
 	<article class="prose max-w-none" aria-label="AI generated summary">
 		<h4 class="text-lg font-semibold mb-2">Latest Summary</h4>
 		<p class="text-sm text-base-content/70 mb-4">
 			Generated at
-			<time datetime={ summary.CreatedAt.Format(time.RFC3339) }>
-				{ summary.CreatedAt.Local().Format("Jan 2, 2006 15:04") }
+			<time datetime={ props.Summary.CreatedAt.Format(time.RFC3339) }>
+				{ props.Summary.CreatedAt.Local().Format("Jan 2, 2006 15:04") }
 			</time>
 		</p>
 		<div class="whitespace-pre-line leading-relaxed text-base">
-			{ sanitizeSummaryContent(summary.Content) }
+			{ sanitizeSummaryContent(props.Summary.Content) }
 		</div>
 	</article>
 	<div class="flex items-center justify-between mt-6 gap-4 flex-wrap">
 		<div class="text-xs text-base-content/60">
 			Summaries are generated from your feeds' articles from the last 24 hours.
 		</div>
-		if canGenerate {
-			<div class="inline-flex items-center gap-2 min-h-[2.75rem]">
-				<button
-					type="submit"
-					class="btn btn-primary btn-sm hide-during-request"
-					aria-label="Generate a new AI summary from the last 24 hours of articles"
-				>
-					Generate New Summary
-				</button>
-				@LoadingState()
-			</div>
+		if props.CanGenerate {
+			@GenerateSummaryAction(GenerateSummaryActionProps{
+				ButtonText: "Generate New Summary",
+				AriaLabel:  "Generate a new AI summary from the last 24 hours of articles",
+				ButtonSize: "btn-sm",
+			})
 		} else {
 			<span class="text-xs text-warning">
 				Add a feed to generate a new summary.
@@ -98,25 +112,19 @@ templ Content(summary models.SummaryViewModel, canGenerate bool) {
 // =======================
 //
 // Encourages the user to generate their first summary.
-templ EmptyState(canGenerate bool) {
-	if canGenerate {
-		<div class="text-center py-12">
-			<div class="text-6xl mb-4" aria-hidden="true">📝</div>
-			<h2 class="text-xl font-semibold mb-2">No summary generated yet</h2>
-			<p class="text-base-content/70 mb-6">
-				Generate a daily summary to get a concise overview of the most recent content from your subscribed feeds.
-			</p>
-			<div class="inline-flex items-center gap-2 min-h-[2.75rem]">
-				<button
-					type="submit"
-					class="btn btn-primary hide-during-request"
-					aria-label="Generate your first AI summary"
-				>
-					Generate Summary
-				</button>
-				@LoadingState()
-			</div>
-		</div>
+templ EmptyState(props EmptyStateProps) {
+	if props.CanGenerate {
+		@components.EmptyStateWithAction(components.EmptyStateWithActionProps{
+			Icon:        "📝",
+			Title:       "No summary generated yet",
+			Description: "Generate a daily summary to get a concise overview of the most recent content from your subscribed feeds.",
+		}) {
+			@GenerateSummaryAction(GenerateSummaryActionProps{
+				ButtonText: "Generate Summary",
+				AriaLabel:  "Generate your first AI summary",
+				ButtonSize: "",
+			})
+		}
 	} else {
 		@components.EmptyState(components.EmptyStateProps{
 			Icon:        "📝",
@@ -126,46 +134,23 @@ templ EmptyState(canGenerate bool) {
 	}
 }
 
-// ==============
-// Loading State
-// ==============
-//
-// HTMX indicator element. Displayed automatically while requests in this container
-// are in-flight. It is always present (hidden when not active).
-templ LoadingState() {
-	<div
-		id="summary-loading-state"
-		class="htmx-indicator flex items-center justify-start gap-2"
-		role="status"
-		aria-live="polite"
-		aria-busy="true"
-	>
-		<span class="loading loading-spinner loading-lg" aria-hidden="true"></span>
-		<span class="text-sm font-medium">Generating your summary...</span>
-	</div>
-}
-
 // =============
 // Error State
 // =============
 //
 // Renders an error message with retry action. Assumes user can still generate.
 templ Error(vm models.SummaryErrorViewModel) {
-	<div class="text-center py-12">
-		<div class="text-6xl mb-4" aria-hidden="true">⚠️</div>
-		<h2 class="text-xl font-semibold mb-2">Failed to generate summary</h2>
-		<p class="text-base-content/70 mb-6">{ vm.ErrorMessage }</p>
-		<div class="inline-flex items-center gap-2 min-h-[2.75rem]">
-			<button
-				type="submit"
-				class="btn btn-primary hide-during-request"
-				aria-label="Try generating the AI summary again"
-			>
-				Try Again
-			</button>
-			@LoadingState()
-		</div>
-	</div>
+	@components.EmptyStateWithAction(components.EmptyStateWithActionProps{
+		Icon:        "⚠️",
+		Title:       "Failed to generate summary",
+		Description: vm.ErrorMessage,
+	}) {
+		@GenerateSummaryAction(GenerateSummaryActionProps{
+			ButtonText: "Try Again",
+			AriaLabel:  "Try generating the AI summary again",
+			ButtonSize: "",
+		})
+	}
 }
 
 // sanitizeSummaryContent escapes any unsafe HTML to prevent injection.

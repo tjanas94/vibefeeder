@@ -76,10 +76,10 @@ templ FeedForm(vm models.FeedFormViewModel) {
 			</button>
 			<button
 				type="submit"
-				class="btn btn-primary min-w-[100px]"
+				class="btn btn-primary min-w-[100px] inline-flex items-center gap-2"
 				aria-label="Save feed"
 			>
-				<span class="htmx-indicator loading loading-spinner loading-sm" aria-hidden="true"></span>
+				@components.ButtonLoader(components.ButtonLoaderProps{})
 				<span>Save</span>
 			</button>
 		</footer>

@@ -39,10 +39,18 @@ type EmptyStateProps struct {
 	ActionAttrs templ.Attributes
 }
 
-// LoadingSpinnerProps defines configuration for the LoadingSpinner component.
-type LoadingSpinnerProps struct {
-	// Size of the spinner: "sm", "md", "lg" (default: "lg")
-	Size string
+// EmptyStateWithActionProps defines configuration for the EmptyStateWithAction component.
+// Use this when you need a custom action (e.g., a form) instead of a simple button.
+type EmptyStateWithActionProps struct {
+	// Icon is an emoji or icon to display above the title
+	// Example: "📡", "🔍", "📝"
+	Icon string
+
+	// Title is the main heading text
+	Title string
+
+	// Description is optional explanatory text displayed below the title
+	Description string
 }
 
 // ModalProps defines configuration for the Modal component.
@@ -72,6 +80,9 @@ type AlertProps struct {
 	// UseOOB determines whether to use hx-swap-oob for out-of-band updates
 	// When true, alert will be injected into #global-errors container
 	UseOOB bool
+
+	// Dismissable determines whether to show the close button (default: false)
+	Dismissable bool
 }
 
 // NavbarProps defines configuration for the Navbar component.
@@ -184,4 +195,37 @@ type TooltipProps struct {
 
 	// "top", "bottom", "left", "right" (default: "top").
 	Position string
+}
+
+// ButtonLoaderProps defines configuration for inline button loaders.
+// Used for quick actions (submit, delete, save) where loader appears inside the button.
+type ButtonLoaderProps struct {
+	// Size of the spinner: "sm", "md", "lg" (default: "sm")
+	Size string
+
+	// LoadingText is optional text to show alongside spinner (default: none)
+	LoadingText string
+}
+
+// ReplaceLoaderProps defines configuration for replacement loaders.
+// Used for long operations (AI, sync) where loader replaces the trigger button.
+type ReplaceLoaderProps struct {
+	// Message to display alongside the spinner
+	Message string
+
+	// Size of the spinner: "sm", "md", "lg" (default: "lg")
+	Size string
+}
+
+// SectionLoaderProps defines configuration for section/content loaders.
+// Used for initial content loading, filters, navigation.
+type SectionLoaderProps struct {
+	// Message to display (default: "Loading...")
+	Message string
+
+	// Size of the spinner: "sm", "md", "lg" (default: "lg")
+	Size string
+
+	// MinHeight sets minimum height for the loading container (e.g., "200px")
+	MinHeight string
 }

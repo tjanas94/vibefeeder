@@ -89,13 +89,17 @@ Implementacja będzie korzystać z istniejących typów DTO zdefiniowanych w bac
 
 - **`models.SummaryDisplayViewModel`**: Główny model widoku przekazywany do komponentu `Display`.
   - `Summary (*SummaryViewModel)`: Dane istniejącego podsumowania (jeśli istnieje).
-  - `ShowEmptyState (bool)`: Flaga wskazująca, czy pokazać stan pusty.
   - `CanGenerate (bool)`: Flaga wskazująca, czy użytkownik spełnia warunki do generowania podsumowania.
+  - `ErrorMessage (string)`: Niepusty string powoduje renderowanie stanu błędu zamiast innych stanów.
+  - Logika renderowania: Komponent `Display` sprawdza w kolejności:
+    1. Jeśli `ErrorMessage` nie jest puste → renderuje `Error` state
+    2. Jeśli `Summary` nie jest `nil` → renderuje `Content` state
+    3. W przeciwnym razie → renderuje `EmptyState`
 - **`models.SummaryViewModel`**: Reprezentuje pojedyncze podsumowanie.
   - `ID (string)`
   - `Content (string)`
   - `CreatedAt (time.Time)`
-- **`models.SummaryErrorViewModel`**: Używany do wyświetlania błędów.
+- **`models.SummaryErrorViewModel`**: Używany wewnętrznie przez komponent `Error` (nie jest przekazywany bezpośrednio z handlera).
   - `ErrorMessage (string)`
 
 ## 6. Zarządzanie stanem
@@ -136,11 +140,12 @@ Zarządzanie stanem jest realizowane głównie po stronie serwera i przez htmx.
 
 ## 10. Obsługa błędów
 
-- **Błąd pobierania ostatniego podsumowania (`GET`):** Jeśli żądanie `GET /summaries/latest` zawiedzie, modal pozostanie pusty lub w stanie początkowym. Można użyć zdarzenia `htmx:responseError` do wyświetlenia globalnego komunikatu (toast).
+- **Błąd pobierania ostatniego podsumowania (`GET`):** Backend renderuje widok `Display` z wypełnionym polem `ErrorMessage` (np. "Failed to load summary. Please try again.").
 - **Błąd generowania podsumowania (`POST`):**
-  - **Brak artykułów (404):** Backend renderuje widok `ErrorState` z komunikatem "No articles found from the last 24 hours".
-  - **Błąd usługi AI (503):** Backend renderuje widok `ErrorState` z komunikatem "AI service is temporarily unavailable".
-  - **Inne błędy serwera (500):** Backend renderuje widok `ErrorState` z ogólnym komunikatem "Failed to generate summary. Please try again.".
+  - **Brak artykułów (404):** Backend renderuje widok `Display` z `ErrorMessage`: "No articles found from the last 24 hours".
+  - **Błąd usługi AI (503):** Backend renderuje widok `Display` z `ErrorMessage`: "AI service is temporarily unavailable".
+  - **Inne błędy serwera (500):** Backend renderuje widok `Display` z `ErrorMessage`: "Failed to generate summary. Please try again.".
+- Komponent `Display` automatycznie wykrywa niepuste `ErrorMessage` i renderuje odpowiedni stan błędu z przyciskiem "Try Again".
 
 ## 11. Kroki implementacji
 
@@ -152,8 +157,8 @@ Zarządzanie stanem jest realizowane głównie po stronie serwera i przez htmx.
     - W komponencie nawigacji (`internal/shared/view/components/navbar.templ`) dodaj `summary.view.NavbarButton`.
 3.  **Modyfikacja handlerów:**
     - Zaktualizuj handler `dashboard.GetDashboard` tak, aby pobierał informację `CanGenerate` i przekazywał ją do `NavbarButton`.
-    - Zaktualizuj handler `summary.GetLatestSummary`, aby renderował komponent `summary.view.Display` z odpowiednim `ViewModel`.
-    - Zaktualizuj handler `summary.PostSummary`, aby w przypadku sukcesu renderował `summary.view.Display`, a w przypadku błędu `summary.view.ErrorState`.
+    - Zaktualizuj handler `summary.GetLatestSummary`, aby renderował komponent `summary.view.Display` z odpowiednim `ViewModel`. W przypadku błędu, ustaw `ErrorMessage` w `SummaryDisplayViewModel`.
+    - Zaktualizuj handler `summary.PostSummary`, aby zawsze renderował `summary.view.Display`. W przypadku błędu, ustaw odpowiedni `ErrorMessage` w `SummaryDisplayViewModel`.
 4.  **Dodanie atrybutów htmx:**
     - Dodaj atrybuty `hx-*` do przycisków w komponentach `Content`, `EmptyState` i `ErrorState`, aby wyzwalały żądanie `POST /summaries`.
     - Skonfiguruj `htmx-indicator` tak, aby wskazywał na komponent `LoadingState`.

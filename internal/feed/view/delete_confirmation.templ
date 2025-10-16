@@ -52,13 +52,13 @@ templ DeleteConfirmation(vm models.DeleteConfirmationViewModel) {
 			</button>
 			<button
 				type="button"
-				class="btn btn-error"
+				class="btn btn-error inline-flex items-center gap-2"
 				hx-delete={ fmt.Sprintf("/feeds/%s", vm.FeedID) }
 				hx-target="#delete-confirmation-modal-content"
 				hx-swap="innerHTML"
 				aria-label={ fmt.Sprintf("Confirm deletion of feed %s", vm.FeedName) }
 			>
-				<span class="htmx-indicator loading loading-spinner loading-sm" aria-hidden="true"></span>
+				@components.ButtonLoader(components.ButtonLoaderProps{})
 				<span>Delete feed</span>
 			</button>
 		</footer>

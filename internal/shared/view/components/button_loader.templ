@@ -1,0 +1,34 @@
+package components
+
+// ButtonLoader renders an inline loading indicator for buttons.
+// Used for quick actions (submit, delete, save) where the loader appears inside the button.
+// The loader is hidden by default and shown via htmx-indicator class.
+//
+// Usage:
+//   <button type="submit" class="btn btn-primary">
+//     @components.ButtonLoader(components.ButtonLoaderProps{})
+//     <span>Save</span>
+//   </button>
+templ ButtonLoader(props ButtonLoaderProps) {
+	<span
+		class={ "htmx-indicator loading loading-spinner", getButtonLoaderSizeClass(props.Size) }
+		aria-hidden="true"
+	></span>
+	if props.LoadingText != "" {
+		<span class="htmx-indicator" aria-hidden="true">{ props.LoadingText }</span>
+	}
+}
+
+// getButtonLoaderSizeClass returns the appropriate DaisyUI size class for button loaders
+func getButtonLoaderSizeClass(size string) string {
+	switch size {
+	case "sm":
+		return "loading-sm"
+	case "md":
+		return "loading-md"
+	case "lg":
+		return "loading-lg"
+	default:
+		return "loading-sm"
+	}
+}

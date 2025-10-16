@@ -73,9 +73,8 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 	// Convert database type to view model
 	summaryVM := models.NewSummaryFromDB(*dbSummary)
 	return &models.SummaryDisplayViewModel{
-		Summary:        &summaryVM,
-		ShowEmptyState: false,
-		CanGenerate:    true, // User just generated, so they have feeds
+		Summary:     &summaryVM,
+		CanGenerate: true, // User just generated, so they have feeds
 	}, nil
 }
 
@@ -168,8 +167,7 @@ func (s *Service) GetLatestSummaryForUser(ctx context.Context, userID string) (*
 
 	// Step 3: Build the view model
 	vm := &models.SummaryDisplayViewModel{
-		ShowEmptyState: len(summaries) == 0,
-		CanGenerate:    canGenerate,
+		CanGenerate: canGenerate,
 	}
 
 	// If summary exists, convert it to view model

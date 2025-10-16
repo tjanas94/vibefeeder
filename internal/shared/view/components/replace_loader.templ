@@ -1,0 +1,48 @@
+package components
+
+// ReplaceLoader renders a replacement loading indicator for long operations.
+// Used for operations >2s (AI generation, sync) where the loader replaces the trigger button.
+// The loader is hidden by default and shown via htmx-indicator class.
+//
+// Usage:
+//   <div class="inline-flex items-center gap-2 min-h-[2.75rem]">
+//     <button type="submit" class="btn btn-primary hide-during-request">
+//       Generate Summary
+//     </button>
+//     @components.ReplaceLoader(components.ReplaceLoaderProps{
+//       Message: "Generating your summary...",
+//     })
+//   </div>
+templ ReplaceLoader(props ReplaceLoaderProps) {
+	<div
+		class="htmx-indicator flex items-center justify-start gap-2"
+		role="status"
+		aria-live="polite"
+		aria-busy="true"
+	>
+		<span class={ "loading loading-spinner", getReplaceLoaderSizeClass(props.Size) } aria-hidden="true"></span>
+		<span class="text-sm font-medium">{ getMessage(props.Message) }</span>
+	</div>
+}
+
+// getReplaceLoaderSizeClass returns the appropriate DaisyUI size class for replace loaders
+func getReplaceLoaderSizeClass(size string) string {
+	switch size {
+	case "sm":
+		return "loading-sm"
+	case "md":
+		return "loading-md"
+	case "lg":
+		return "loading-lg"
+	default:
+		return "loading-lg"
+	}
+}
+
+// getMessage returns the message or a default value
+func getMessage(message string) string {
+	if message == "" {
+		return "Loading..."
+	}
+	return message
+}

@@ -21,8 +21,30 @@ templ EmptyState(props EmptyStateProps) {
 				class="btn btn-primary"
 				{ props.ActionAttrs... }
 			>
-				{ props.ActionText }
+				@ButtonLoader(ButtonLoaderProps{})
+				<span>{ props.ActionText }</span>
 			</button>
 		}
+	</div>
+}
+
+// EmptyStateWithAction renders a centered message with an icon, title, description, and custom action children.
+// Use this when you need a custom action (e.g., a form) instead of a simple button.
+templ EmptyStateWithAction(props EmptyStateWithActionProps) {
+	<div class="text-center py-12">
+		<!-- Icon/Emoji -->
+		if props.Icon != "" {
+			<div class="text-6xl mb-4" aria-hidden="true">{ props.Icon }</div>
+		}
+		<!-- Title -->
+		if props.Title != "" {
+			<h2 class="text-xl font-semibold mb-2">{ props.Title }</h2>
+		}
+		<!-- Description -->
+		if props.Description != "" {
+			<p class="text-base-content/70 mb-6">{ props.Description }</p>
+		}
+		<!-- Custom action slot -->
+		{ children... }
 	</div>
 }

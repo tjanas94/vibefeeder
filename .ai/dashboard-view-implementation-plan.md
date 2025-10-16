@@ -234,7 +234,7 @@ Jedynym warunkiem dla tego widoku jest uwierzytelnienie użytkownika. Jest to w 
       - `hx-get="/feeds"`
       - `hx-trigger="load, refreshFeedList from:document"`
       - `hx-include="#feed-filter-form"`
-    - Umieść w nim wskaźnik ładowania (komponent `LoadingSpinner`).
+    - Umieść w nim wskaźnik ładowania (komponent `SectionLoader`).
 
 7.  **Dodanie Modali**: Dodaj struktury HTML dla trzech okien modalnych używając komponentu `components.Modal` z odpowiednimi `ID`, `ContentID`, `AlpineStateVar` i `MaxWidth`.
 

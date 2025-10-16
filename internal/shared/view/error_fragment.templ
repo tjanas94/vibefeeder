@@ -6,9 +6,10 @@ import "github.com/tjanas94/vibefeeder/internal/shared/view/components"
 // Uses hx-swap-oob to inject into global error container
 templ ErrorFragment(props ErrorFragmentProps) {
 	@components.Alert(components.AlertProps{
-		Type:     "error",
-		ShowIcon: true,
-		UseOOB:   true,
+		Type:        "error",
+		ShowIcon:    true,
+		UseOOB:      true,
+		Dismissable: true,
 	}) {
 		{ props.Message }
 	}

@@ -374,9 +374,9 @@ Get the most recent summary for authenticated user.
 
 ```go
 type SummaryDisplayViewModel struct {
-    Summary *SummaryViewModel
-    ShowEmptyState bool
-    CanGenerate bool // true if user has at least one working feed
+    Summary      *SummaryViewModel
+    CanGenerate  bool
+    ErrorMessage string
 }
 
 type SummaryViewModel struct {
@@ -416,9 +416,9 @@ Generate a new AI summary from articles published in the last 24 hours.
 
 ```go
 type SummaryDisplayViewModel struct {
-    Summary *SummaryViewModel
-    ShowEmptyState bool
-    CanGenerate bool
+    Summary      *SummaryViewModel
+    CanGenerate  bool
+    ErrorMessage string
 }
 
 type SummaryErrorViewModel struct {
