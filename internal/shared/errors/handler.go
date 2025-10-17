@@ -72,6 +72,8 @@ func NewHTTPErrorHandler(logger *slog.Logger) echo.HTTPErrorHandler {
 		var component templ.Component
 		if isHTMX {
 			// For HTMX requests, use error fragment with hx-swap-oob
+			// Set HX-Reswap: none to prevent clearing the main target (e.g., modal content)
+			c.Response().Header().Set("HX-Reswap", "none")
 			component = sharedview.ErrorFragment(sharedview.ErrorFragmentProps{
 				Message: message,
 			})

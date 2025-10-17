@@ -2,6 +2,7 @@ package app
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -39,13 +40,26 @@ func (a *App) setupRoutes() {
 	a.Echo.DELETE("/feeds/:id", feedHandler.DeleteFeed)
 
 	// Summary routes (authenticated with rate limiting)
-	aiClient := ai.NewOpenRouterClient(a.Config.OpenRouter.APIKey)
-	summaryService := summary.NewService(a.DB, aiClient, a.Logger)
+	// Create HTTP client with timeout for OpenRouter API
+	httpClient := &http.Client{
+		Timeout: 90 * time.Second,
+	}
+
+	aiService, err := ai.NewOpenRouterService(a.Config.OpenRouter, httpClient)
+	if err != nil {
+		a.Logger.Error("Failed to initialize OpenRouter service", "error", err)
+		panic("OpenRouter service is required but failed to initialize: " + err.Error())
+	}
+
+	summaryService := summary.NewService(a.DB, aiService, a.Logger)
 	summaryHandler := summary.NewHandler(summaryService, a.Logger)
 
-	// Configure rate limiter: 1 request per 5 minutes per user
-	// rate.Every(5 * time.Minute) = 1 request every 5 minutes
-	rateLimiterStore := middleware.NewRateLimiterMemoryStore(rate.Every(5 * 60)) // 1 request per 300 seconds
+	// Configure rate limiter from config (defaults to 30 seconds for testing, 300 for production)
+	// Burst must be at least 1 to allow any requests (rate.Every returns fractional rate < 1)
+	rateLimiterStore := middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
+		Rate:  rate.Every(a.Config.RateLimit.SummaryGenerationInterval),
+		Burst: 1, // Allow 1 immediate request, then enforce rate limit
+	})
 
 	// Create authenticated route group
 	// Note: MockAuthMiddleware is already applied globally in setupMiddleware

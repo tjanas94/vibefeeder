@@ -78,7 +78,6 @@ templ Display(vm models.SummaryDisplayViewModel) {
 // Shows "Generate New Summary" if the user can generate another summary.
 templ Content(props ContentProps) {
 	<article class="prose max-w-none" aria-label="AI generated summary">
-		<h4 class="text-lg font-semibold mb-2">Latest Summary</h4>
 		<p class="text-sm text-base-content/70 mb-4">
 			Generated at
 			<time datetime={ props.Summary.CreatedAt.Format(time.RFC3339) }>

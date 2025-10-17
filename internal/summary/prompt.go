@@ -7,8 +7,15 @@ import (
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 )
 
+const (
+	systemPrompt = "You are a helpful assistant that creates concise and insightful summaries of news articles and blog posts. Focus on extracting key themes, main points, and actionable insights."
+	// maxContentLength limits the number of characters from each article's content
+	maxContentLength = 1000
+)
+
 // buildPromptFromArticles creates a prompt for the AI from article data.
 // This is a pure function with no side effects.
+// Article content is truncated to maxContentLength to prevent excessive token usage.
 func buildPromptFromArticles(articles []models.ArticleForPrompt) string {
 	var sb strings.Builder
 
@@ -19,7 +26,12 @@ func buildPromptFromArticles(articles []models.ArticleForPrompt) string {
 		sb.WriteString(fmt.Sprintf("Title: %s\n", article.Title))
 
 		if article.Content != nil && *article.Content != "" {
-			sb.WriteString(fmt.Sprintf("Content: %s\n", *article.Content))
+			content := *article.Content
+			// Truncate content if it exceeds maxContentLength
+			if len(content) > maxContentLength {
+				content = content[:maxContentLength] + "..."
+			}
+			sb.WriteString(fmt.Sprintf("Content: %s\n", content))
 		}
 
 		sb.WriteString("\n")

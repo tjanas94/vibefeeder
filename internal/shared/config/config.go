@@ -16,6 +16,7 @@ type Config struct {
 	Log        LogConfig
 	OpenRouter OpenRouterConfig
 	Fetcher    FetcherConfig
+	RateLimit  RateLimitConfig
 }
 
 // ServerConfig contains server configuration
@@ -38,6 +39,11 @@ type SupabaseConfig struct {
 // OpenRouterConfig contains OpenRouter AI service configuration
 type OpenRouterConfig struct {
 	APIKey string
+}
+
+// RateLimitConfig contains rate limiting configuration
+type RateLimitConfig struct {
+	SummaryGenerationInterval time.Duration // Minimum interval between summary generation requests per user
 }
 
 // FetcherConfig holds configuration for the feed fetcher service
@@ -72,7 +78,7 @@ func Load() (*Config, error) {
 			Format: getEnvOrDefault("LOG_FORMAT", "json"),
 		},
 		OpenRouter: OpenRouterConfig{
-			APIKey: getEnvOrDefault("OPENROUTER_API_KEY", "mock-api-key"),
+			APIKey: os.Getenv("OPENROUTER_API_KEY"),
 		},
 		Fetcher: FetcherConfig{
 			FetchInterval:       getDurationSeconds("FETCHER_INTERVAL", 300),          // 5 minutes
@@ -84,6 +90,9 @@ func Load() (*Config, error) {
 			JobTimeout:          getDurationSeconds("FETCHER_JOB_TIMEOUT", 45),
 			MaxArticlesPerFeed:  getEnvInt("FETCHER_MAX_ARTICLES", 100),
 			MaxResponseBodySize: int64(getEnvInt("FETCHER_MAX_BODY_SIZE_MB", 2) * 1024 * 1024),
+		},
+		RateLimit: RateLimitConfig{
+			SummaryGenerationInterval: getDurationSeconds("RATE_LIMIT_SUMMARY_INTERVAL", 30), // 30 seconds (for testing, use 300 for production)
 		},
 	}
 
@@ -126,6 +135,10 @@ func (c *Config) validate() error {
 
 	if c.Supabase.Key == "" {
 		return fmt.Errorf("SUPABASE_KEY is required")
+	}
+
+	if c.OpenRouter.APIKey == "" {
+		return fmt.Errorf("OPENROUTER_API_KEY is required")
 	}
 
 	return nil

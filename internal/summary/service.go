@@ -7,13 +7,19 @@ import (
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
+	"github.com/tjanas94/vibefeeder/internal/shared/ai"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 )
 
+const (
+	// maxArticlesForSummary limits the number of articles fetched for summary generation
+	maxArticlesForSummary = 100
+)
+
 // AIClient defines the interface for AI service communication
 type AIClient interface {
-	GenerateSummary(ctx context.Context, prompt string) (string, error)
+	GenerateChatCompletion(ctx context.Context, options ai.GenerateChatCompletionOptions) (*ai.ChatCompletionResponse, error)
 }
 
 // Service handles business logic for summary generation
@@ -51,11 +57,27 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 	aiCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	summaryContent, err := s.aiClient.GenerateSummary(aiCtx, prompt)
+	// Prepare AI request options
+	options := ai.GenerateChatCompletionOptions{
+		Model:        "openai/gpt-4o-mini",
+		SystemPrompt: systemPrompt,
+		UserPrompt:   prompt,
+		Temperature:  0.7,
+		MaxTokens:    2000,
+	}
+
+	response, err := s.aiClient.GenerateChatCompletion(aiCtx, options)
 	if err != nil {
 		s.logger.Error("AI service failed to generate summary", "user_id", userID, "error", err)
 		return nil, ErrAIServiceUnavailable
 	}
+
+	// Extract summary content from response
+	if len(response.Choices) == 0 || response.Choices[0].Message.Content == "" {
+		s.logger.Error("AI service returned empty response", "user_id", userID)
+		return nil, ErrAIServiceUnavailable
+	}
+	summaryContent := response.Choices[0].Message.Content
 
 	// Step 4: Save summary to database
 	dbSummary, err := s.saveSummary(ctx, userID, summaryContent)
@@ -78,7 +100,8 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 	}, nil
 }
 
-// fetchRecentArticles retrieves all articles published in the last 24 hours for the user's feeds
+// fetchRecentArticles retrieves articles published in the last 24 hours for the user's feeds
+// Limited to maxArticlesForSummary most recent articles
 func (s *Service) fetchRecentArticles(ctx context.Context, userID string) ([]models.ArticleForPrompt, error) {
 	// Calculate 24 hours ago timestamp
 	twentyFourHoursAgo := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
@@ -90,7 +113,8 @@ func (s *Service) fetchRecentArticles(ctx context.Context, userID string) ([]mod
 		Select("title, content, feeds!inner(user_id)", "", false).
 		Eq("feeds.user_id", userID).
 		Gte("published_at", twentyFourHoursAgo).
-		Order("published_at", nil).
+		Order("published_at", &postgrest.OrderOpts{Ascending: false}).
+		Limit(maxArticlesForSummary, "").
 		ExecuteTo(&articles)
 
 	if err != nil {
@@ -106,10 +130,11 @@ func (s *Service) saveSummary(ctx context.Context, userID, content string) (*dat
 
 	var result []database.PublicSummariesSelect
 	_, err := s.db.From("summaries").
-		Insert(insert, false, "", "*", "").
+		Insert(insert, false, "", "", "").
 		ExecuteTo(&result)
 
 	if err != nil {
+		s.logger.Error("database insert failed", "user_id", userID, "error", err)
 		return nil, err
 	}
 
@@ -130,7 +155,7 @@ func (s *Service) recordSummaryEvent(ctx context.Context, userID string) error {
 
 	var result []database.PublicEventsSelect
 	_, err := s.db.From("events").
-		Insert(event, false, "", "*", "").
+		Insert(event, false, "", "", "").
 		ExecuteTo(&result)
 
 	return err
