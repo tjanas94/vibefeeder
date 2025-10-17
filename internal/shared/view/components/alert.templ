@@ -27,7 +27,7 @@ templ Alert(props AlertProps) {
 // alertContent renders the actual alert box with appropriate styling
 templ alertContent(props AlertProps) {
 	<div
-		class={ "alert", getAlertTypeClass(props.Type), "shadow-lg" }
+		class={ "alert", getAlertTypeClass(props.Type), "shadow-lg", "pointer-events-auto" }
 		if props.Dismissable {
 			x-data="{ show: true }"
 			x-show="show"

@@ -24,7 +24,7 @@ templ Toast(props ToastProps) {
 // toastContent renders the actual toast box with appropriate styling and close button
 templ toastContent(props ToastProps) {
 	<div
-		class={ "alert", getToastTypeClass(props.Type), "shadow-lg" }
+		class={ "alert", getToastTypeClass(props.Type), "shadow-lg", "pointer-events-auto" }
 		x-data="{ show: true }"
 		x-show="show"
 		x-init={ "setTimeout(() => show = false, " + getToastDuration(props.Duration) + ")" }
