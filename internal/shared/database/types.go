@@ -10,6 +10,7 @@ type PublicFeedsSelect struct {
 	LastFetchedAt   *string `json:"last_fetched_at"`
 	LastModified    *string `json:"last_modified"`
 	Name            string  `json:"name"`
+	RetryCount      int     `json:"retry_count"`
 	UpdatedAt       string  `json:"updated_at"`
 	Url             string  `json:"url"`
 	UserId          string  `json:"user_id"`
@@ -25,6 +26,7 @@ type PublicFeedsInsert struct {
 	LastFetchedAt   *string `json:"last_fetched_at"`
 	LastModified    *string `json:"last_modified"`
 	Name            string  `json:"name"`
+	RetryCount      *int    `json:"retry_count,omitempty"`
 	UpdatedAt       *string `json:"updated_at,omitempty"`
 	Url             string  `json:"url"`
 	UserId          string  `json:"user_id"`
@@ -40,6 +42,7 @@ type PublicFeedsUpdate struct {
 	LastFetchedAt   *string `json:"last_fetched_at,omitempty"`
 	LastModified    *string `json:"last_modified,omitempty"`
 	Name            *string `json:"name,omitempty"`
+	RetryCount      *int    `json:"retry_count,omitempty"`
 	UpdatedAt       *string `json:"updated_at,omitempty"`
 	Url             *string `json:"url,omitempty"`
 	UserId          *string `json:"user_id,omitempty"`

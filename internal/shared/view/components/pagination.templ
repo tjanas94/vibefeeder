@@ -15,12 +15,15 @@ templ Pagination(props PaginationProps) {
 			<!-- Previous Button -->
 			if props.Pagination.HasPrevious {
 				<button
-					class="join-item btn"
+					class="join-item btn relative"
 					hx-get={ models.BuildPageURL(props.BaseURL, props.Pagination.CurrentPage-1) }
 					hx-target="#feed-list"
 					hx-include={ props.FormID }
 					aria-label={ fmt.Sprintf("Go to previous page %d", props.Pagination.CurrentPage-1) }
 				>
+					<span class="absolute -left-2 top-1/2 -translate-y-1/2">
+						@ButtonLoader(ButtonLoaderProps{Size: "sm"})
+					</span>
 					<span aria-hidden="true">«</span>
 				</button>
 			} else {
@@ -43,12 +46,15 @@ templ Pagination(props PaginationProps) {
 				} else {
 					<!-- Other Pages -->
 					<button
-						class="join-item btn"
+						class="join-item btn relative"
 						hx-get={ models.BuildPageURL(props.BaseURL, pageNum) }
 						hx-target="#feed-list"
 						hx-include={ props.FormID }
 						aria-label={ fmt.Sprintf("Go to page %d", pageNum) }
 					>
+						<span class="absolute -left-3 top-1/2 -translate-y-1/2">
+							@ButtonLoader(ButtonLoaderProps{Size: "sm"})
+						</span>
 						{ fmt.Sprintf("%d", pageNum) }
 					</button>
 				}
@@ -56,12 +62,15 @@ templ Pagination(props PaginationProps) {
 			<!-- Next Button -->
 			if props.Pagination.HasNext {
 				<button
-					class="join-item btn"
+					class="join-item btn relative"
 					hx-get={ models.BuildPageURL(props.BaseURL, props.Pagination.CurrentPage+1) }
 					hx-target="#feed-list"
 					hx-include={ props.FormID }
 					aria-label={ fmt.Sprintf("Go to next page %d", props.Pagination.CurrentPage+1) }
 				>
+					<span class="absolute -left-2 top-1/2 -translate-y-1/2">
+						@ButtonLoader(ButtonLoaderProps{Size: "sm"})
+					</span>
 					<span aria-hidden="true">»</span>
 				</button>
 			} else {

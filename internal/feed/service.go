@@ -49,24 +49,25 @@ func (s *Service) ListFeeds(ctx context.Context, query models.ListFeedsQuery) (*
 	return &viewModel, nil
 }
 
-// CreateFeed creates a new feed for the authenticated user
-func (s *Service) CreateFeed(ctx context.Context, cmd models.CreateFeedCommand, userID string) error {
+// CreateFeed creates a new feed for the authenticated user and returns the feed ID
+func (s *Service) CreateFeed(ctx context.Context, cmd models.CreateFeedCommand, userID string) (string, error) {
 	// Convert command to insert model
 	feedInsert := cmd.ToInsert(userID)
 
 	// Insert feed into database
-	if err := s.repo.InsertFeed(ctx, feedInsert); err != nil {
+	feedID, err := s.repo.InsertFeed(ctx, feedInsert)
+	if err != nil {
 		// Check if error is due to unique constraint violation (duplicate URL for user)
 		if database.IsUniqueViolationError(err) {
-			return ErrFeedAlreadyExists
+			return "", ErrFeedAlreadyExists
 		}
-		return fmt.Errorf("failed to create feed: %w", err)
+		return "", fmt.Errorf("failed to create feed: %w", err)
 	}
 
 	// Log feed_added event (non-critical, ignores errors)
 	s.logFeedAddedEvent(ctx, userID, cmd.Name, cmd.URL)
 
-	return nil
+	return feedID, nil
 }
 
 // logFeedAddedEvent logs feed_added event (non-critical operation, ignores errors)
@@ -103,35 +104,38 @@ func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*m
 }
 
 // UpdateFeed updates an existing feed with validation and conflict detection
-func (s *Service) UpdateFeed(ctx context.Context, feedID, userID string, cmd models.UpdateFeedCommand) error {
+// Returns true if URL was changed, false otherwise
+func (s *Service) UpdateFeed(ctx context.Context, feedID, userID string, cmd models.UpdateFeedCommand) (bool, error) {
 	// Get existing feed to verify ownership
 	existingFeed, err := s.repo.FindFeedByIDAndUser(ctx, feedID, userID)
 	if err != nil {
 		if database.IsNotFoundError(err) {
-			return ErrFeedNotFound
+			return false, ErrFeedNotFound
 		}
-		return fmt.Errorf("failed to get feed for update: %w", err)
+		return false, fmt.Errorf("failed to get feed for update: %w", err)
 	}
 
 	// Prepare update data based on whether URL changed
 	var updateData database.PublicFeedsUpdate
-	if existingFeed.Url == cmd.URL {
+	urlChanged := existingFeed.Url != cmd.URL
+
+	if !urlChanged {
 		// Name-only update - preserves fetch-related fields
 		updateData = cmd.ToUpdate()
 	} else {
 		// URL changed - validate and reset fetch-related fields
 		if err := s.validateURLChange(ctx, userID, feedID, cmd.URL); err != nil {
-			return err
+			return false, err
 		}
 		updateData = cmd.ToUpdateWithURLChange()
 	}
 
 	// Perform update
 	if err := s.repo.UpdateFeed(ctx, feedID, updateData); err != nil {
-		return fmt.Errorf("failed to update feed: %w", err)
+		return false, fmt.Errorf("failed to update feed: %w", err)
 	}
 
-	return nil
+	return urlChanged, nil
 }
 
 // validateURLChange checks if new URL can be used

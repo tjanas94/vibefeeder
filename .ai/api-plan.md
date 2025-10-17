@@ -72,7 +72,7 @@ Note: `ListFeedsQuery` contains: `Search`, `Status`, `Page` fields with validati
 - Feed list container uses `hx-get="/feeds"` with `hx-trigger="load, refreshFeedList from:body"` and `hx-include="#feed-filters"`
 - Filter form (#feed-filters) uses `hx-get="/feeds"` to reload feed list on change/submit
 - Summary container uses `hx-get="/summaries/latest"` with `hx-trigger="load"`
-- All feed mutations (POST, DELETE) use `hx-include="#feed-filters"` to preserve current filter state
+- All feed mutations (POST, PATCH, DELETE) use `hx-include="#feed-filters"` to preserve current filter state
 - After mutations, server can return `HX-Trigger: refreshFeedList` to reload feed list with current filters
 - Pagination links include current query params: `/feeds?search={Query.Search}&status={Query.Status}&page={N}`
 
@@ -147,7 +147,7 @@ type PaginationViewModel struct {
 - Listens for `refreshFeedList` event from body to refresh after mutations
 - Called by filter form with `hx-trigger="input changed delay:500ms from:#search, change from:#status"`
 - Pagination links use `hx-include="#feed-filters"` to preserve filter state
-- Triggered by successful POST /feeds, POST /feeds/{id}, and DELETE /feeds/{id} operations
+- Triggered by successful POST /feeds, PATCH /feeds/{id}, and DELETE /feeds/{id} operations
 
 ---
 
@@ -249,7 +249,7 @@ type FeedEditFormViewModel struct {
 
 ---
 
-#### POST /feeds/{id}
+#### PATCH /feeds/{id}
 
 Update existing feed and trigger feed list refresh.
 
@@ -590,7 +590,7 @@ All endpoints except:
    - If exists, return 409 with error "You have already added this feed"
 3. Insert feed: `INSERT INTO feeds (user_id, name, url, fetch_after) VALUES (?, ?, ?, NOW() + INTERVAL '5 minutes')`
 4. Record `feed_added` event: `INSERT INTO events (user_id, event_type, metadata) VALUES (?, 'feed_added', '{"feed_id": "..."}')`
-5. Enqueue feed for fetch: Push `{feed_id, url}` to fetch queue
+5. Trigger immediate fetch: Call `FetchFeedNow(feed_id)` to start fetching in background immediately
 6. Return 204 No Content with HX-Trigger header to refresh feed list
 
 #### Feed Update Flow
@@ -610,11 +610,12 @@ All endpoints except:
        last_fetch_error = NULL,
        last_modified = NULL,
        etag = NULL,
-       fetch_after = NOW() + INTERVAL '5 minutes'
+       fetch_after = NOW() + INTERVAL '5 minutes',
+       retry_count = 0
      WHERE id = ?
      ```
 
-     - Enqueue feed for fetch: Push `{feed_id, url}` to fetch queue
+     - Trigger immediate fetch: Call `FetchFeedNow(feed_id)` to start fetching in background immediately
 
    - If only name changed:
      ```sql
@@ -665,23 +666,21 @@ All endpoints except:
 
 #### Article Fetch Background Job
 
-**Architecture:** Single process with goroutine worker pool consuming from buffered channel (Go channel acts as in-memory queue)
+**Architecture:** Single process with goroutine worker pool using database polling
 
-**Queue Configuration:**
+**Configuration:**
 
-- Channel buffer size: 10,000 (configurable)
-- Worker pool size: configurable (recommended: 10-50 workers)
-- Non-blocking push from cron job and handlers (graceful degradation when queue full)
+- Worker pool size: 10 workers (configurable)
+- Fetch interval: Every 5 minutes
 
 **Trigger:** Runs every 5 minutes
 
-**Race Condition Prevention:**
+**Queueing Mechanism:**
 
-- New/updated feeds always created with `fetch_after = NOW() + 5 minutes`
-- No immediate fetch from HTTP handlers = no race with cron job
-- Single instance architecture = single cron job = no concurrent SELECT
-- Channel guarantees atomic reads = each worker gets unique feed
-- `fetch_after` acts as sufficient lock for single instance MVP
+- `fetch_after` timestamp acts as natural queue mechanism for scheduled fetching
+- New/updated feeds created with `fetch_after = NOW() + 5 minutes` (fallback for regular cron cycle)
+- HTTP handlers trigger immediate fetch via `FetchFeedNow(feedID)` after INSERT/UPDATE
+- Background job polls database for feeds WHERE `fetch_after <= NOW()` (scheduled refresh)
 
 **Feed Status Values:**
 
@@ -695,12 +694,11 @@ All endpoints except:
 1. Get feeds ready for fetching (ordered by priority):
 
    ```sql
-   SELECT id, url, last_modified, etag, last_fetch_status
+   SELECT id, url, last_modified, etag, last_fetch_status, retry_count
    FROM feeds
    WHERE last_fetch_status NOT IN ('permanent_error', 'unauthorized')
      AND (fetch_after IS NULL OR fetch_after <= NOW())
    ORDER BY last_fetched_at NULLS FIRST
-   LIMIT 1000
    ```
 
 2. For each feed:
@@ -761,7 +759,8 @@ All endpoints except:
          last_fetch_status = 'temporary_error',
          last_fetch_error = 'Rate limited',
          last_fetched_at = NOW(),
-         fetch_after = ? -- from Retry-After header or exponential backoff
+         fetch_after = ?, -- from Retry-After header or exponential backoff
+         retry_count = retry_count + 1
        WHERE id = ?
        ```
      - **5xx Server Errors / Timeouts**:
@@ -771,7 +770,8 @@ All endpoints except:
          last_fetch_status = 'temporary_error',
          last_fetch_error = ?,
          last_fetched_at = NOW(),
-         fetch_after = NOW() + INTERVAL '...' -- exponential backoff
+         fetch_after = NOW() + INTERVAL '...', -- exponential backoff based on retry_count
+         retry_count = retry_count + 1
        WHERE id = ?
        ```
 
@@ -788,7 +788,8 @@ All endpoints except:
      last_fetched_at = NOW(),
      last_modified = ?, -- from response headers
      etag = ?,          -- from response headers
-     fetch_after = NOW() + INTERVAL '...' -- from cache headers or default 1 hour
+     fetch_after = NOW() + INTERVAL '...', -- from cache headers or default 1 hour
+     retry_count = 0
    WHERE id = ?
    ```
 
@@ -798,13 +799,13 @@ All endpoints except:
 
 - **Conditional Requests**: Uses `Last-Modified` and `ETag` headers to avoid redundant downloads (HTTP 304)
 - **Respect Retry-After**: Honors `Retry-After` header from 429 responses
-- **Exponential Backoff**: Applies increasing delays for `temporary_error` feeds (5min → 15min → 1h → 6h → 24h)
+- **Exponential Backoff**: Applies increasing delays for `temporary_error` feeds based on `retry_count` (5min → 15min → 1h → 6h → 24h)
 - **Permanent Error Handling**: Never retries `permanent_error` or `unauthorized` feeds
 - **Fetch Scheduling**: Uses `fetch_after` column to prevent premature retries
 - **Success Scheduling**: Successful fetches are scheduled 1 hour later
 - **Priority Queue**: Fetches never-fetched feeds first (NULLS FIRST), then by oldest `last_fetched_at`
 - **Content-Type Validation**: Rejects non-XML responses as permanent errors
-- **Domain Concurrency Control**: Only 1 concurrent request per domain (sync.Map with per-domain locks)
+- **Domain Rate Limiting**: Minimum 3 seconds delay between requests to same domain
 
 **Error Handling:**
 
@@ -822,11 +823,4 @@ All endpoints except:
 
 **SSRF Protection:**
 
-- Block private/loopback/link-local IPs (10.x.x.x, 192.168.x.x, 172.16.x.x, 127.x.x.x, 169.254.x.x, ::1)
-- Allow only http:// and https:// schemes (block file://, ftp://, etc.)
-- Validate URLs at three points:
-  1. POST /feeds - before saving to database
-  2. Before fetch - in background job (DNS rebinding protection)
-  3. On redirects - before following (prevent redirect-based SSRF)
-- Custom HTTP transport validates IPs during connection establishment
-- Limit redirect chain to 5 hops maximum
+- Validate URLs to prevent connections to private/internal networks

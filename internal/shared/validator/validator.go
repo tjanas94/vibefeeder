@@ -3,6 +3,8 @@ package validator
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -18,12 +20,25 @@ type CustomValidator struct {
 func New() *CustomValidator {
 	v := validator.New()
 
-	// Register custom validation tags here if needed
-	// Example: v.RegisterValidation("custom_tag", customValidationFunc)
+	// Register custom validation for http/https URLs
+	_ = v.RegisterValidation("httpurl", validateHTTPURL)
 
 	return &CustomValidator{
 		validator: v,
 	}
+}
+
+// validateHTTPURL validates that a URL has http or https scheme
+func validateHTTPURL(fl validator.FieldLevel) bool {
+	urlStr := fl.Field().String()
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
+
+	scheme := strings.ToLower(parsedURL.Scheme)
+	return scheme == "http" || scheme == "https"
 }
 
 // Validate validates a struct based on validation tags
@@ -64,6 +79,8 @@ func formatFieldError(err validator.FieldError) string {
 		return "Must be a valid email address"
 	case "url":
 		return "Must be a valid URL"
+	case "httpurl":
+		return "Must be a valid HTTP or HTTPS URL"
 	case "min":
 		return fmt.Sprintf("Must be at least %s characters long", param)
 	case "max":

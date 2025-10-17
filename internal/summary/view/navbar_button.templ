@@ -25,14 +25,16 @@ templ NavbarButton() {
 	<!-- Active button when feeds exist -->
 	<button
 		x-show="hasFeeds"
-		class="btn btn-ghost hover:btn-neutral"
+		class="btn btn-ghost hover:btn-neutral relative"
 		@click="lastFocusedElement = $event.target"
 		hx-get="/summaries/latest"
 		hx-target="#summary-modal-content"
 		hx-trigger="click"
 		aria-label="View latest AI summary"
 	>
-		@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
+		<span class="absolute -left-2 top-1/2 -translate-y-1/2">
+			@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
+		</span>
 		<span>★ Summary</span>
 	</button>
 }

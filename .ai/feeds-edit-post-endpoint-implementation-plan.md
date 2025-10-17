@@ -1,4 +1,4 @@
-# API Endpoint Implementation Plan: POST /feeds/{id}
+# API Endpoint Implementation Plan: PATCH /feeds/{id}
 
 ## 1. Przegląd punktu końcowego
 
@@ -6,7 +6,7 @@ Ten punkt końcowy obsługuje aktualizację istniejącego kanału (feed) na pods
 
 ## 2. Szczegóły żądania
 
-- **Metoda HTTP:** `POST`
+- **Metoda HTTP:** `PATCH`
 - **Struktura URL:** `/feeds/{id}`
 - **Parametry:**
   - **Ścieżki (Path):**
@@ -76,7 +76,7 @@ Ten punkt końcowy obsługuje aktualizację istniejącego kanału (feed) na pods
 
 ## 7. Etapy wdrożenia
 
-1.  **Routing:** Zarejestruj trasę `POST /feeds/:id` w `internal/app/routes.go`, przypisując ją do `feed.Handler.HandleUpdate` i stosując middleware `auth`.
+1.  **Routing:** Zarejestruj trasę `PATCH /feeds/:id` w `internal/app/routes.go`, przypisując ją do `feed.Handler.HandleUpdate` i stosując middleware `auth`.
 2.  **Handler (`feed.Handler`):**
     - Zaimplementuj metodę `HandleUpdate(c echo.Context) error`.
     - Pobierz `id` z `c.Param("id")` i `userID` z kontekstu.

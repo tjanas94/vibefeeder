@@ -11,15 +11,15 @@ import (
 // Used by: POST /feeds
 type CreateFeedCommand struct {
 	Name string `form:"name" json:"name" validate:"required,max=255"`
-	URL  string `form:"url" json:"url" validate:"required,url"`
+	URL  string `form:"url" json:"url" validate:"required,httpurl"`
 }
 
 // UpdateFeedCommand represents the input for updating an existing feed.
 // Maps to database.PublicFeedsUpdate (subset of fields).
-// Used by: POST /feeds/{id}
+// Used by: PATCH /feeds/{id}
 type UpdateFeedCommand struct {
 	Name string `form:"name" json:"name" validate:"required,max=255"`
-	URL  string `form:"url" json:"url" validate:"required,url"`
+	URL  string `form:"url" json:"url" validate:"required,httpurl"`
 }
 
 // ToInsert converts CreateFeedCommand to database.PublicFeedsInsert.

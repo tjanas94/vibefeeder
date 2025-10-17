@@ -36,13 +36,13 @@ Hierarchia komponentów będzie zintegrowana z istniejącym widokiem panelu gł�
 
 - **Opis komponentu:** Komponent `templ` renderujący formularz do dodawania lub edycji feedu. Jest ładowany dynamicznie do modala.
 - **Główne elementy:**
-  - `<form>` z atrybutami `hx-post` ustawionymi dynamicznie na `/feeds` lub `/feeds/{id}`.
+  - `<form>` z atrybutami `hx-post` (dla dodawania) lub `hx-patch` (dla edycji) ustawionymi dynamicznie na `/feeds` lub `/feeds/{id}`.
   - `input` dla nazwy (`name="name"`, label "Name") i adresu URL (`name="url"`, label "URL").
   - Komunikaty błędów wyświetlane pod odpowiednimi polami formularza (z `Errors.NameError` i `Errors.URLError`).
   - Ogólny komunikat błędu na górze formularza (z `Errors.GeneralError`) dla błędów nie związanych z konkretnymi polami.
   - Przyciski "Save" i "Cancel".
 - **Obsługiwane interakcje:**
-  - `hx-post`: Wysłanie formularza z `hx-swap="outerHTML"` aby zastąpić cały formularz w przypadku błędu.
+  - `hx-post` (dodawanie) lub `hx-patch` (edycja): Wysłanie formularza z `hx-swap="outerHTML"` aby zastąpić cały formularz w przypadku błędu.
   - `hx-on::after-request`: Zamknięcie modala po pomyślnym zapisie (status `204`). `if(event.detail.xhr.status === 204) this.closest('dialog').close()`
 - **Obsługiwana walidacja:**
   - `name`: `required`, `max=255` (po stronie klienta: `required`).
@@ -74,7 +74,7 @@ Hierarchia komponentów będzie zintegrowana z istniejącym widokiem panelu gł�
 - **Pola:**
   - `Mode string`: Tryb formularza ("add" lub "edit").
   - `Title string`: Tytuł modala ("Add New Feed" / "Edit Feed").
-  - `PostURL string`: Docelowy URL dla `hx-post` (`/feeds` lub `/feeds/{id}`).
+  - `PostURL string`: Docelowy URL dla `hx-post`/`hx-patch` (`/feeds` dla dodawania lub `/feeds/{id}` dla edycji).
   - `FeedID string`: ID edytowanego feedu (opcjonalne).
   - `Name string`: Aktualna nazwa (do wypełnienia formularza - z inputu użytkownika lub z bazy).
   - `URL string`: Aktualny URL (do wypełnienia formularza - z inputu użytkownika lub z bazy).
@@ -122,7 +122,7 @@ Stan będzie zarządzany głównie przez `htmx` poprzez dynamiczne ładowanie tr
   - **Żądanie:** `multipart/form-data` z `name` i `url`.
   - **Odpowiedź (Sukces):** `204 No Content` z nagłówkiem `HX-Trigger: refreshFeedList`.
   - **Odpowiedź (Błąd):** `400/409/500` z pełnym komponentem `FeedFormView` zawierającym wprowadzone dane użytkownika i wypełniony `FeedFormErrorViewModel` z komunikatami błędów. Formularz zastępuje poprzednią wersję dzięki `hx-swap="outerHTML"`.
-- **Edycja (`POST /feeds/{id}`):**
+- **Edycja (`PATCH /feeds/{id}`):**
   - **Żądanie:** `multipart/form-data` z `name` i `url`.
   - **Odpowiedź (Sukces):** `204 No Content` z `HX-Trigger: refreshFeedList`.
   - **Odpowiedź (Błąd):** `400/404/409/500` z pełnym komponentem `FeedFormView` zawierającym wprowadzone dane użytkownika i wypełniony `FeedFormErrorViewModel` z komunikatami błędów. Formularz zastępuje poprzednią wersję dzięki `hx-swap="outerHTML"`.
@@ -186,7 +186,7 @@ Stan będzie zarządzany głównie przez `htmx` poprzez dynamiczne ładowanie tr
     - Zaimplementuj handler `GET /feeds/new`, który renderuje `FeedFormView` z `ViewModel` w trybie "add" i pustymi błędami.
     - Zaimplementuj handler `GET /feeds/{id}/edit`, który renderuje `FeedFormView` z `ViewModel` w trybie "edit", wypełnionymi danymi z bazy i pustymi błędami.
     - Zaimplementuj handler `POST /feeds`, który w przypadku błędu walidacji zwraca pełny komponent `FeedFormView` z wprowadzonymi danymi i wypełnionymi błędami.
-    - Zaimplementuj handler `POST /feeds/{id}`, który w przypadku błędu walidacji zwraca pełny komponent `FeedFormView` z wprowadzonymi danymi i wypełnionymi błędami.
+    - Zaimplementuj handler `PATCH /feeds/{id}`, który w przypadku błędu walidacji zwraca pełny komponent `FeedFormView` z wprowadzonymi danymi i wypełnionymi błędami.
     - Zaimplementuj handler `GET /feeds/{id}/delete`, który renderuje `DeleteConfirmationView` z `ViewModel` zawierającym dane feedu.
     - Zaimplementuj handler `DELETE /feeds/{id}`, który w przypadku błędu zwraca pełny komponent `DeleteConfirmationView` z komunikatem błędu.
 7.  **Testowanie:** Przetestuj wszystkie ścieżki użytkownika: dodawanie, edycja, usuwanie, w tym scenariusze błędów i walidacji.

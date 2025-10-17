@@ -11,7 +11,7 @@ var statusLabels = map[string]string{
 // StatusFilterGroup renders a group of radio buttons styled as a button group
 // Uses DaisyUI's join component for the button group styling
 templ StatusFilterGroup(props StatusFilterGroupProps) {
-	<div class="join" role="radiogroup" aria-label="Filter by status">
+	<div class="join flex w-full sm:w-auto" role="radiogroup" aria-label="Filter by status">
 		for _, option := range props.Options {
 			@StatusFilterButton(StatusFilterButtonProps{
 				Name:    props.Name,

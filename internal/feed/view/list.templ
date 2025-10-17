@@ -43,8 +43,9 @@ templ List(vm models.FeedListViewModel) {
 			})
 		</div>
 	} else {
-		<!-- Feed List Table -->
-		<div class="overflow-x-auto">
+		<!-- Feed List: Desktop Table, Mobile Cards -->
+		<!-- Desktop Table (hidden on mobile) -->
+		<div class="hidden sm:block overflow-x-auto">
 			<table class="table table-zebra w-full" aria-label="RSS feed list">
 				<caption class="sr-only">
 					RSS feed list with edit and delete actions
@@ -63,6 +64,12 @@ templ List(vm models.FeedListViewModel) {
 					}
 				</tbody>
 			</table>
+		</div>
+		<!-- Mobile Cards (visible only on mobile) -->
+		<div class="sm:hidden space-y-4">
+			for _, feed := range vm.Feeds {
+				@FeedCard(feed)
+			}
 		</div>
 		<!-- Pagination -->
 		if vm.Pagination.TotalPages > 1 {
@@ -83,12 +90,12 @@ templ FeedSearchFilter(props FeedSearchFilterProps) {
 		class="relative space-y-4"
 		hx-get="/feeds"
 		hx-target="#feed-list"
-		hx-trigger="change from:input[type=radio], keyup changed delay:500ms from:input[type=search], search from:input[type=search]"
+		hx-trigger="change from:input[type=radio], keyup changed delay:500ms from:input[type=search], search from:input[type=search], refreshFeedList from:document"
 		role="search"
 		aria-label="Search and filter feeds"
 	>
 		<!-- Filter fields wrapper -->
-		<div class="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center">
+		<div class="flex flex-col sm:flex-row gap-4 items-stretch">
 			<!-- Search Input -->
 			<label for="feed-search" class="sr-only">Search feeds by name</label>
 			<input
@@ -96,7 +103,7 @@ templ FeedSearchFilter(props FeedSearchFilterProps) {
 				type="search"
 				name="search"
 				placeholder="Search by name..."
-				class="input input-bordered flex-1"
+				class="input input-bordered w-full sm:grow"
 				value={ props.Search }
 				aria-label="Search feeds by name"
 			/>
@@ -108,7 +115,7 @@ templ FeedSearchFilter(props FeedSearchFilterProps) {
 			})
 		</div>
 		<!-- Loading indicator below filters - absolute positioned to prevent layout shift -->
-		<div class="htmx-indicator absolute left-1/2 -translate-x-1/2 top-[calc(100%+1.5rem)] flex items-center justify-center gap-2">
+		<div class="htmx-indicator absolute left-1/2 -translate-x-1/2 top-[calc(100%+1.5rem)] flex items-center justify-center gap-2 z-10">
 			<span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
 			<span class="text-sm font-medium">Loading...</span>
 		</div>
@@ -157,14 +164,14 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 				}) {
 					<button
 						type="button"
-						class="btn btn-sm btn-ghost w-[3.5rem] flex items-center justify-center gap-1 px-2"
+						class="btn btn-sm btn-ghost relative"
 						@click="lastFocusedElement = $event.target"
 						hx-get={ fmt.Sprintf("/feeds/%s/edit", feed.ID) }
 						hx-target="#feed-form-modal-content"
 						hx-trigger="click"
 						aria-label={ fmt.Sprintf("Edit feed %s", feed.Name) }
 					>
-						<span class="w-4 flex justify-center">
+						<span class="absolute -left-2 top-1/2 -translate-y-1/2">
 							@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
 						</span>
 						<span aria-hidden="true">✏️</span>
@@ -177,14 +184,14 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 				}) {
 					<button
 						type="button"
-						class="btn btn-sm btn-ghost text-error w-[3.5rem] flex items-center justify-center gap-1 px-2"
+						class="btn btn-sm btn-ghost text-error relative"
 						@click="lastFocusedElement = $event.target"
 						hx-get={ fmt.Sprintf("/feeds/%s/delete", feed.ID) }
 						hx-target="#delete-confirmation-modal-content"
 						hx-trigger="click"
 						aria-label={ fmt.Sprintf("Delete feed %s", feed.Name) }
 					>
-						<span class="w-4 flex justify-center">
+						<span class="absolute -left-2 top-1/2 -translate-y-1/2">
 							@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
 						</span>
 						<span aria-hidden="true">🗑️</span>
@@ -193,4 +200,73 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 			</div>
 		</td>
 	</tr>
+}
+
+// FeedCard renders a single feed as a card for mobile view
+templ FeedCard(feed models.FeedItemViewModel) {
+	<div class="card bg-base-200 shadow-md">
+		<div class="card-body p-4">
+			<!-- Header: Name and Status -->
+			<div class="flex items-start justify-between gap-2 mb-2">
+				<h3 class="card-title text-base">{ feed.Name }</h3>
+				<div class="flex-shrink-0">
+					if feed.HasError {
+						@components.Badge(components.BadgeProps{
+							Text:    "Error",
+							Type:    "error",
+							Icon:    "❌",
+							Tooltip: feed.ErrorMessage,
+						})
+					} else if feed.LastFetchedAt.IsZero() {
+						@components.Badge(components.BadgeProps{
+							Text: "Pending",
+							Type: "warning",
+							Icon: "⏳",
+						})
+					} else {
+						@components.Badge(components.BadgeProps{
+							Text: "OK",
+							Type: "success",
+							Icon: "✅",
+						})
+					}
+				</div>
+			</div>
+			<!-- URL -->
+			<p class="text-sm text-base-content/70 break-all mb-3">{ feed.URL }</p>
+			<!-- Actions -->
+			<div class="card-actions justify-end">
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost relative"
+					@click="lastFocusedElement = $event.target"
+					hx-get={ fmt.Sprintf("/feeds/%s/edit", feed.ID) }
+					hx-target="#feed-form-modal-content"
+					hx-trigger="click"
+					aria-label={ fmt.Sprintf("Edit feed %s", feed.Name) }
+				>
+					<span class="absolute -left-2 top-1/2 -translate-y-1/2">
+						@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
+					</span>
+					<span aria-hidden="true">✏️</span>
+					<span>Edit</span>
+				</button>
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost text-error relative"
+					@click="lastFocusedElement = $event.target"
+					hx-get={ fmt.Sprintf("/feeds/%s/delete", feed.ID) }
+					hx-target="#delete-confirmation-modal-content"
+					hx-trigger="click"
+					aria-label={ fmt.Sprintf("Delete feed %s", feed.Name) }
+				>
+					<span class="absolute -left-2 top-1/2 -translate-y-1/2">
+						@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
+					</span>
+					<span aria-hidden="true">🗑️</span>
+					<span>Delete</span>
+				</button>
+			</div>
+		</div>
+	</div>
 }

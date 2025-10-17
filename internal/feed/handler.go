@@ -15,17 +15,24 @@ import (
 	sharedview "github.com/tjanas94/vibefeeder/internal/shared/view/components"
 )
 
+// FeedFetcher is an interface for triggering immediate feed fetches
+type FeedFetcher interface {
+	FetchFeedNow(feedID string)
+}
+
 // Handler handles HTTP requests for feed operations
 type Handler struct {
-	service *Service
-	logger  *slog.Logger
+	service     *Service
+	logger      *slog.Logger
+	feedFetcher FeedFetcher
 }
 
 // NewHandler creates a new feed handler
-func NewHandler(service *Service, logger *slog.Logger) *Handler {
+func NewHandler(service *Service, logger *slog.Logger, feedFetcher FeedFetcher) *Handler {
 	return &Handler{
-		service: service,
-		logger:  logger,
+		service:     service,
+		logger:      logger,
+		feedFetcher: feedFetcher,
 	}
 }
 
@@ -157,7 +164,8 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 	}
 
 	// Call service to create feed
-	if err := h.service.CreateFeed(c.Request().Context(), *cmd, userID); err != nil {
+	feedID, err := h.service.CreateFeed(c.Request().Context(), *cmd, userID)
+	if err != nil {
 		// Handle specific error types
 		if err == ErrFeedAlreadyExists {
 			h.logger.Info("duplicate feed attempt", "user_id", userID, "url", cmd.URL)
@@ -175,6 +183,12 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 		}
 		vm := models.NewFeedFormWithErrors("add", "", cmd.Name, cmd.URL, errorVM)
 		return c.Render(http.StatusInternalServerError, "", view.FeedForm(vm))
+	}
+
+	// Trigger immediate fetch for the newly created feed
+	if h.feedFetcher != nil {
+		h.feedFetcher.FetchFeedNow(feedID)
+		h.logger.Info("Triggered immediate fetch for new feed", "feed_id", feedID)
 	}
 
 	// Success - refresh feed list, close modal and show toast
@@ -221,7 +235,7 @@ func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 	return c.Render(http.StatusOK, "", view.FeedForm(*vm))
 }
 
-// HandleUpdate handles POST /feeds/:id endpoint
+// HandleUpdate handles PATCH /feeds/:id endpoint
 // Updates an existing feed for the authenticated user
 func (h *Handler) HandleUpdate(c echo.Context) error {
 	// Get user ID from authenticated session
@@ -267,7 +281,8 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 	}
 
 	// Call service to update feed
-	if err := h.service.UpdateFeed(c.Request().Context(), feedID, userID, *cmd); err != nil {
+	urlChanged, err := h.service.UpdateFeed(c.Request().Context(), feedID, userID, *cmd)
+	if err != nil {
 		// Handle specific error types
 		if err == ErrFeedNotFound {
 			h.logger.Info("feed not found or unauthorized", "feed_id", feedID, "user_id", userID)
@@ -279,7 +294,7 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 		}
 
 		if err == ErrFeedURLConflict {
-			h.logger.Info("duplicate feed URL attempt", "feed_id", feedID, "user_id", userID, "url", cmd.URL)
+			h.logger.Info("url already in use", "feed_id", feedID, "user_id", userID, "url", cmd.URL)
 			errorVM := models.FeedFormErrorViewModel{
 				URLError: "You have already added this feed",
 			}
@@ -294,6 +309,12 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 		}
 		vm := models.NewFeedFormWithErrors("edit", feedID, cmd.Name, cmd.URL, errorVM)
 		return c.Render(http.StatusInternalServerError, "", view.FeedForm(vm))
+	}
+
+	// Trigger immediate fetch if URL changed
+	if urlChanged && h.feedFetcher != nil {
+		h.feedFetcher.FetchFeedNow(feedID)
+		h.logger.Info("Triggered immediate fetch after URL change", "feed_id", feedID)
 	}
 
 	// Success - refresh feed list, close modal and show toast

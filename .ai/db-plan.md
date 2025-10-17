@@ -18,6 +18,7 @@ Stores RSS feed sources added by users.
 | `last_modified`     | `VARCHAR(255)` | `NULL`                                                 | HTTP Last-Modified header for conditional requests |
 | `etag`              | `VARCHAR(255)` | `NULL`                                                 | HTTP ETag header for conditional requests          |
 | `fetch_after`       | `TIMESTAMPTZ`  | `NULL`                                                 | Earliest time to fetch this feed                   |
+| `retry_count`       | `INTEGER`      | `NOT NULL DEFAULT 0`                                   | Consecutive failed fetch attempts (for backoff)    |
 | `created_at`        | `TIMESTAMPTZ`  | `NOT NULL DEFAULT NOW()`                               | Timestamp when the feed was created                |
 | `updated_at`        | `TIMESTAMPTZ`  | `NOT NULL DEFAULT NOW()`                               | Timestamp when the feed was last updated           |
 

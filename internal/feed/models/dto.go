@@ -18,7 +18,7 @@ type FeedListViewModel struct {
 
 // FeedItemViewModel represents a single feed item for display.
 // Derived from database.PublicFeedsSelect with computed HasError field.
-// Used by: GET /feeds, POST /feeds, POST /feeds/{id}, GET /dashboard
+// Used by: GET /feeds, POST /feeds, PATCH /feeds/{id}, GET /dashboard
 type FeedItemViewModel struct {
 	ID            string    `json:"id"`
 	Name          string    `json:"name"`
@@ -41,7 +41,7 @@ type FeedFormViewModel struct {
 }
 
 // FeedFormErrorViewModel represents validation errors for feed forms.
-// Used by: POST /feeds, POST /feeds/{id}
+// Used by: POST /feeds, PATCH /feeds/{id}
 type FeedFormErrorViewModel struct {
 	NameError    string `json:"name_error,omitempty"`
 	URLError     string `json:"url_error,omitempty"`

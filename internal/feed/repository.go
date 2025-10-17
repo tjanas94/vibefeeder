@@ -69,14 +69,19 @@ func (r *Repository) ListFeeds(ctx context.Context, query models.ListFeedsQuery)
 	}, nil
 }
 
-// InsertFeed creates a new feed in the database
-func (r *Repository) InsertFeed(ctx context.Context, feed database.PublicFeedsInsert) error {
+// InsertFeed creates a new feed in the database and returns the created feed ID
+func (r *Repository) InsertFeed(ctx context.Context, feed database.PublicFeedsInsert) (string, error) {
 	var result []database.PublicFeedsSelect
 	_, err := r.db.From("feeds").Insert(feed, false, "", "", "").ExecuteTo(&result)
 	if err != nil {
-		return fmt.Errorf("failed to insert feed: %w", err)
+		return "", fmt.Errorf("failed to insert feed: %w", err)
 	}
-	return nil
+
+	if len(result) == 0 {
+		return "", fmt.Errorf("no feed returned after insert")
+	}
+
+	return result[0].Id, nil
 }
 
 // InsertEvent creates a new event in the database

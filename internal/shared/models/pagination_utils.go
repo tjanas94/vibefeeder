@@ -65,17 +65,3 @@ func GetPaginationRange(currentPage, totalPages int) []int {
 
 	return pages
 }
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

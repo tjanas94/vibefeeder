@@ -17,7 +17,11 @@ templ FeedForm(vm models.FeedFormViewModel) {
 		}
 	</h3>
 	<form
-		hx-post={ vm.PostURL }
+		if vm.Mode == "add" {
+			hx-post={ vm.PostURL }
+		} else {
+			hx-patch={ vm.PostURL }
+		}
 		hx-target="#feed-form-modal-content"
 		hx-swap="innerHTML"
 		class="space-y-4"

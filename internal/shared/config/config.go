@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -13,6 +15,7 @@ type Config struct {
 	Supabase   SupabaseConfig
 	Log        LogConfig
 	OpenRouter OpenRouterConfig
+	Fetcher    FetcherConfig
 }
 
 // ServerConfig contains server configuration
@@ -37,6 +40,19 @@ type OpenRouterConfig struct {
 	APIKey string
 }
 
+// FetcherConfig holds configuration for the feed fetcher service
+type FetcherConfig struct {
+	FetchInterval       time.Duration // How often to check for feeds to fetch (in seconds)
+	SuccessInterval     time.Duration // Minimum interval after successful fetch (in seconds)
+	WorkerCount         int           // Number of concurrent workers
+	BatchSize           int           // Maximum number of feeds to process per batch
+	DomainDelay         time.Duration // Delay between requests to same domain (in seconds)
+	JobTimeout          time.Duration // Timeout for entire job (in seconds)
+	RequestTimeout      time.Duration // Timeout for HTTP request (in seconds)
+	MaxArticlesPerFeed  int           // Maximum number of articles to save per feed
+	MaxResponseBodySize int64         // Maximum response body size in bytes
+}
+
 // Load reads configuration from environment variables
 // It automatically loads .env file if present
 func Load() (*Config, error) {
@@ -58,6 +74,17 @@ func Load() (*Config, error) {
 		OpenRouter: OpenRouterConfig{
 			APIKey: getEnvOrDefault("OPENROUTER_API_KEY", "mock-api-key"),
 		},
+		Fetcher: FetcherConfig{
+			FetchInterval:       getDurationSeconds("FETCHER_INTERVAL", 300),          // 5 minutes
+			SuccessInterval:     getDurationSeconds("FETCHER_SUCCESS_INTERVAL", 3600), // 1 hour
+			WorkerCount:         getEnvInt("FETCHER_WORKERS", 10),
+			BatchSize:           getEnvInt("FETCHER_BATCH_SIZE", 1000),
+			DomainDelay:         getDurationSeconds("FETCHER_DOMAIN_DELAY", 3),
+			RequestTimeout:      getDurationSeconds("FETCHER_REQUEST_TIMEOUT", 30),
+			JobTimeout:          getDurationSeconds("FETCHER_JOB_TIMEOUT", 45),
+			MaxArticlesPerFeed:  getEnvInt("FETCHER_MAX_ARTICLES", 100),
+			MaxResponseBodySize: int64(getEnvInt("FETCHER_MAX_BODY_SIZE_MB", 2) * 1024 * 1024),
+		},
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -73,6 +100,22 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvInt returns environment variable as int or default
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// getDurationSeconds returns environment variable as duration in seconds or default
+func getDurationSeconds(key string, defaultSeconds int) time.Duration {
+	seconds := getEnvInt(key, defaultSeconds)
+	return time.Duration(seconds) * time.Second
 }
 
 // validate checks if all required configuration values are set

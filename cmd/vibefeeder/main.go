@@ -21,6 +21,9 @@ func main() {
 
 	logger := application.Logger
 
+	// Start feed fetcher service
+	application.StartFeedFetcher()
+
 	// Channel to capture server errors
 	serverErrors := make(chan error, 1)
 

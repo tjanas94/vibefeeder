@@ -156,8 +156,8 @@ Główny widok po zalogowaniu to "powłoka aplikacji" (app shell), która zawier
   - **Struktura:**
     - **Lewa strona:**
       - Logo/nazwa aplikacji ("VibeFeeder").
-      - Przycisk "Summary" (otwiera modal podsumowania).
     - **Prawa strona:**
+      - Przycisk "Summary" (otwiera modal podsumowania).
       - E-mail zalogowanego użytkownika.
       - Przycisk/link "Sign Out".
 

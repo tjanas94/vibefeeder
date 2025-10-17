@@ -61,7 +61,7 @@ templ Index(vm models.DashboardViewModel) {
 						id="feed-list"
 						class="min-h-[200px]"
 						hx-get="/feeds"
-						hx-trigger="load, refreshFeedList from:document"
+						hx-trigger="load"
 						hx-include="#feed-filter-form"
 					>
 						@components.SectionLoader(components.SectionLoaderProps{

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/labstack/echo/v4"
+	"github.com/tjanas94/vibefeeder/internal/fetcher"
 	"github.com/tjanas94/vibefeeder/internal/shared/config"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
 	"github.com/tjanas94/vibefeeder/internal/shared/errors"
@@ -16,10 +17,13 @@ import (
 
 // App holds the application dependencies
 type App struct {
-	Echo   *echo.Echo
-	Config *config.Config
-	DB     *database.Client
-	Logger *slog.Logger
+	Echo         *echo.Echo
+	Config       *config.Config
+	DB           *database.Client
+	Logger       *slog.Logger
+	FeedFetcher  *fetcher.FeedFetcherService
+	AppCtx       context.Context
+	CancelAppCtx context.CancelFunc
 }
 
 // New creates and configures a new application instance
@@ -46,6 +50,12 @@ func New() (*App, error) {
 
 	log.Info("Database connection established")
 
+	// Create application context for graceful shutdown
+	appCtx, cancelAppCtx := context.WithCancel(context.Background())
+
+	// Initialize feed fetcher service
+	feedFetcher := fetcher.NewFeedFetcherService(db, log, cfg.Fetcher, appCtx)
+
 	// Create Echo instance
 	e := echo.New()
 
@@ -61,10 +71,13 @@ func New() (*App, error) {
 
 	// Create app instance
 	app := &App{
-		Echo:   e,
-		Config: cfg,
-		DB:     db,
-		Logger: log,
+		Echo:         e,
+		Config:       cfg,
+		DB:           db,
+		Logger:       log,
+		FeedFetcher:  feedFetcher,
+		AppCtx:       appCtx,
+		CancelAppCtx: cancelAppCtx,
 	}
 
 	// Register custom error handler
@@ -94,6 +107,9 @@ func (a *App) Start() error {
 func (a *App) Shutdown(ctx context.Context) error {
 	a.Logger.Info("Shutting down application...")
 
+	// Cancel application context to signal feed fetcher to stop
+	a.CancelAppCtx()
+
 	// Shutdown Echo server
 	if err := a.Echo.Shutdown(ctx); err != nil {
 		a.Logger.Error("Error shutting down server", "error", err)
@@ -102,4 +118,10 @@ func (a *App) Shutdown(ctx context.Context) error {
 
 	a.Logger.Info("Application shut down successfully")
 	return nil
+}
+
+// StartFeedFetcher starts the feed fetcher service in a goroutine
+func (a *App) StartFeedFetcher() {
+	go a.FeedFetcher.Start()
+	a.Logger.Info("Feed fetcher service started")
 }
