@@ -33,7 +33,6 @@ Główny widok po zalogowaniu to "powłoka aplikacji" (app shell), która zawier
 - **Kluczowe komponenty widoku:**
   - Formularz rejestracji.
   - Pola tekstowe: "Email", "Password", "Confirm Password".
-  - Pole wyboru (checkbox) do akceptacji polityki prywatności: "I agree to the Privacy Policy".
   - Przycisk "Sign Up".
   - Link do widoku logowania: "Already have an account? Sign in".
 - **UX, dostępność i względy bezpieczeństwa:**

@@ -2,6 +2,7 @@ package view
 
 import (
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
+	"github.com/tjanas94/vibefeeder/internal/shared/csrf"
 	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
 )
 
@@ -27,6 +28,7 @@ templ FeedForm(vm models.FeedFormViewModel) {
 		class="space-y-4"
 		aria-labelledby="feed-form-modal-title"
 	>
+		<input type="hidden" name="csrf_token" value={ csrf.Token(ctx) }/>
 		<fieldset class="space-y-4">
 			<legend class="sr-only">Feed details</legend>
 			<!-- Name Field -->

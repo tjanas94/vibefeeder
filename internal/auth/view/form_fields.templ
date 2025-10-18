@@ -1,0 +1,97 @@
+package view
+
+import "github.com/tjanas94/vibefeeder/internal/shared/view/components"
+
+// EmailField renders an email input field for authentication forms
+templ EmailField(email string, emailError string) {
+	@components.FormField(components.FormFieldProps{
+		Label:       "Email address",
+		ID:          "email",
+		Name:        "email",
+		Type:        "email",
+		Value:       email,
+		Placeholder: "your@email.com",
+		Error:       emailError,
+		Required:    true,
+	})
+}
+
+// PasswordField renders a password input field for authentication forms
+templ PasswordField(passwordError string) {
+	@components.FormField(components.FormFieldProps{
+		Label:       "Password",
+		ID:          "password",
+		Name:        "password",
+		Type:        "password",
+		Value:       "",
+		Placeholder: "",
+		Error:       passwordError,
+		Required:    true,
+	})
+}
+
+// PasswordConfirmField renders a password confirmation input field
+templ PasswordConfirmField(passwordConfirmError string) {
+	@components.FormField(components.FormFieldProps{
+		Label:       "Confirm password",
+		ID:          "password_confirm",
+		Name:        "password_confirm",
+		Type:        "password",
+		Value:       "",
+		Placeholder: "",
+		Error:       passwordConfirmError,
+		Required:    true,
+	})
+}
+
+// RegistrationCodeField renders a registration code input field
+templ RegistrationCodeField(code string, codeError string) {
+	@components.FormField(components.FormFieldProps{
+		Label:       "Registration code",
+		ID:          "registration_code",
+		Name:        "registration_code",
+		Type:        "text",
+		Value:       code,
+		Placeholder: "Enter registration code",
+		Error:       codeError,
+		Required:    true,
+	})
+}
+
+// AuthCard renders a card container for authentication forms
+templ AuthCard() {
+	<div class="card bg-base-200 shadow-xl">
+		<div class="card-body">
+			{ children... }
+		</div>
+	</div>
+}
+
+// AuthCardTitle renders a title for authentication cards
+templ AuthCardTitle(title string) {
+	<h1 class="card-title text-2xl font-bold mb-6 justify-center">
+		{ title }
+	</h1>
+}
+
+// AuthLink renders a link for navigation between authentication pages
+templ AuthLink(href string, text string) {
+	<a
+		href={ templ.SafeURL(href) }
+		class="link link-primary text-sm"
+	>
+		{ text }
+	</a>
+}
+
+// SubmitButton renders a submit button for authentication forms
+templ SubmitButton(text string) {
+	<button
+		type="submit"
+		class="btn btn-primary w-full"
+		aria-label={ text }
+	>
+		@components.ButtonLoader(components.ButtonLoaderProps{})
+		<span>{ text }</span>
+	</button>
+}

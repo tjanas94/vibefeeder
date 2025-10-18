@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	authModule "github.com/tjanas94/vibefeeder/internal/auth"
 	"github.com/tjanas94/vibefeeder/internal/dashboard"
 	"github.com/tjanas94/vibefeeder/internal/feed"
 	"github.com/tjanas94/vibefeeder/internal/shared/ai"
@@ -16,31 +17,64 @@ import (
 
 // setupRoutes configures all application routes
 func (a *App) setupRoutes() {
-	// Health check endpoint
+	// Health check endpoint (public)
 	a.Echo.GET("/healthz", a.healthCheck)
 
-	// Redirect root to dashboard
-	a.Echo.GET("/", func(c echo.Context) error {
+	// Initialize auth components
+	authRepo := authModule.NewRepository(a.DB)
+	authService, err := authModule.NewService(a.Config.Supabase.URL, a.Config.Supabase.Key, authRepo, &a.Config.Auth, a.Logger)
+	if err != nil {
+		a.Logger.Error("Failed to initialize auth service", "error", err)
+		panic("Auth service is required but failed to initialize: " + err.Error())
+	}
+	sessionManager := authModule.NewSessionManager(&a.Config.Auth)
+	requireRegCode := a.Config.Auth.RegistrationCode != ""
+	authHandler := authModule.NewHandler(authService, sessionManager, a.Logger, requireRegCode)
+
+	// Create middleware adapter
+	authMiddlewareAdapter := authModule.NewMiddlewareAdapter(authService)
+
+	// Public routes (no authentication required)
+	publicGroup := a.Echo.Group("/auth")
+	publicGroup.GET("/login", authHandler.ShowLoginPage)
+	publicGroup.POST("/login", authHandler.HandleLogin)
+	publicGroup.GET("/register", authHandler.ShowRegisterPage)
+	publicGroup.POST("/register", authHandler.HandleRegister)
+	publicGroup.GET("/confirm", authHandler.HandleConfirm)
+	publicGroup.GET("/forgot-password", authHandler.ShowForgotPasswordPage)
+	publicGroup.POST("/forgot-password", authHandler.HandleForgotPassword)
+	publicGroup.GET("/reset-password", authHandler.ShowResetPasswordPage)
+	publicGroup.POST("/reset-password", authHandler.HandleResetPassword)
+
+	// Protected routes (authentication required)
+	protectedGroup := a.Echo.Group("")
+	protectedGroup.Use(auth.AuthMiddleware(authMiddlewareAdapter, sessionManager, a.Logger))
+	protectedGroup.Use(a.csrfMiddleware())
+
+	// Root redirect to dashboard
+	protectedGroup.GET("/", func(c echo.Context) error {
 		return c.Redirect(http.StatusFound, "/dashboard")
 	})
 
-	// Dashboard routes (authenticated)
-	dashboardHandler := dashboard.NewHandler(a.Logger)
-	a.Echo.GET("/dashboard", dashboardHandler.ShowDashboard)
+	// Logout endpoint
+	protectedGroup.POST("/auth/logout", authHandler.HandleLogout)
 
-	// Feed routes (authenticated)
+	// Dashboard routes
+	dashboardHandler := dashboard.NewHandler(a.Logger)
+	protectedGroup.GET("/dashboard", dashboardHandler.ShowDashboard)
+
+	// Feed routes
 	feedService := feed.NewService(a.DB, a.Logger)
 	feedHandler := feed.NewHandler(feedService, a.Logger, a.FeedFetcher)
-	a.Echo.GET("/feeds", feedHandler.ListFeeds)
-	a.Echo.GET("/feeds/new", feedHandler.HandleFeedAddForm)
-	a.Echo.POST("/feeds", feedHandler.CreateFeed)
-	a.Echo.GET("/feeds/:id/edit", feedHandler.HandleFeedEditForm)
-	a.Echo.PATCH("/feeds/:id", feedHandler.HandleUpdate)
-	a.Echo.GET("/feeds/:id/delete", feedHandler.HandleDeleteConfirmation)
-	a.Echo.DELETE("/feeds/:id", feedHandler.DeleteFeed)
+	protectedGroup.GET("/feeds", feedHandler.ListFeeds)
+	protectedGroup.GET("/feeds/new", feedHandler.HandleFeedAddForm)
+	protectedGroup.POST("/feeds", feedHandler.CreateFeed)
+	protectedGroup.GET("/feeds/:id/edit", feedHandler.HandleFeedEditForm)
+	protectedGroup.PATCH("/feeds/:id", feedHandler.HandleUpdate)
+	protectedGroup.GET("/feeds/:id/delete", feedHandler.HandleDeleteConfirmation)
+	protectedGroup.DELETE("/feeds/:id", feedHandler.DeleteFeed)
 
-	// Summary routes (authenticated with rate limiting)
-	// Create HTTP client with timeout for OpenRouter API
+	// Summary routes with rate limiting
 	httpClient := &http.Client{
 		Timeout: 90 * time.Second,
 	}
@@ -54,25 +88,16 @@ func (a *App) setupRoutes() {
 	summaryService := summary.NewService(a.DB, aiService, a.Logger)
 	summaryHandler := summary.NewHandler(summaryService, a.Logger)
 
-	// Configure rate limiter from config (defaults to 30 seconds for testing, 300 for production)
-	// Burst must be at least 1 to allow any requests (rate.Every returns fractional rate < 1)
+	// Configure rate limiter from config
 	rateLimiterStore := middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
 		Rate:  rate.Every(a.Config.RateLimit.SummaryGenerationInterval),
-		Burst: 1, // Allow 1 immediate request, then enforce rate limit
+		Burst: 1,
 	})
 
-	// Create authenticated route group
-	// Note: MockAuthMiddleware is already applied globally in setupMiddleware
-	// TODO: Replace with real user ID from JWT when auth is implemented
-
-	// Summary endpoints
-	a.Echo.GET("/summaries/latest", summaryHandler.GetLatestSummary)
-
-	// Apply rate limiting to summary generation endpoint (per user based on context)
-	a.Echo.POST("/summaries", summaryHandler.GenerateSummary, middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+	protectedGroup.GET("/summaries/latest", summaryHandler.GetLatestSummary)
+	protectedGroup.POST("/summaries", summaryHandler.GenerateSummary, middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 		Store: rateLimiterStore,
 		IdentifierExtractor: func(c echo.Context) (string, error) {
-			// Extract user ID from context for per-user rate limiting
 			userID := auth.GetUserID(c)
 			return userID, nil
 		},

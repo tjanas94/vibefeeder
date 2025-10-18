@@ -30,14 +30,6 @@ func NewHandler(service *Service, logger *slog.Logger) *Handler {
 func (h *Handler) GenerateSummary(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		errVM := &models.SummaryDisplayViewModel{
-			ErrorMessage: "Authentication required",
-			CanGenerate:  false,
-		}
-		return c.Render(http.StatusUnauthorized, "", view.Display(*errVM))
-	}
 
 	// Call service to generate summary and get view model
 	vm, err := h.service.GenerateSummary(c.Request().Context(), userID)
@@ -86,10 +78,6 @@ func (h *Handler) GenerateSummary(c echo.Context) error {
 func (h *Handler) GetLatestSummary(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		return echo.NewHTTPError(http.StatusUnauthorized, "Authentication required")
-	}
 
 	// Call service to get latest summary and view model
 	vm, err := h.service.GetLatestSummaryForUser(c.Request().Context(), userID)

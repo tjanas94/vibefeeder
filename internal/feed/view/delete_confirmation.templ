@@ -3,6 +3,7 @@ package view
 import (
 	"fmt"
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
+	"github.com/tjanas94/vibefeeder/internal/shared/csrf"
 	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
 )
 
@@ -54,6 +55,7 @@ templ DeleteConfirmation(vm models.DeleteConfirmationViewModel) {
 				type="button"
 				class="btn btn-error inline-flex items-center gap-2"
 				hx-delete={ fmt.Sprintf("/feeds/%s", vm.FeedID) }
+				hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrf.Token(ctx)) }
 				hx-target="#delete-confirmation-modal-content"
 				hx-swap="innerHTML"
 				aria-label={ fmt.Sprintf("Confirm deletion of feed %s", vm.FeedName) }

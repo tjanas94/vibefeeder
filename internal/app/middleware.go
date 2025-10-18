@@ -1,9 +1,11 @@
 package app
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/tjanas94/vibefeeder/internal/shared/auth"
+	"github.com/tjanas94/vibefeeder/internal/shared/csrf"
 	"github.com/tjanas94/vibefeeder/internal/shared/logger"
 )
 
@@ -13,10 +15,6 @@ func (a *App) setupMiddleware() {
 	a.Echo.Use(logger.RequestLoggerConfig(a.Logger))
 	a.Echo.Use(middleware.Recover())
 	a.Echo.Use(middleware.BodyLimit("2M"))
-
-	// Development middleware (mock auth)
-	// TODO: Replace with real authentication when auth is implemented
-	a.Echo.Use(auth.MockAuthMiddleware("4f7ed431-4b99-478e-b060-a5a36a46e85d"))
 
 	// Security middleware
 	a.Echo.Use(middleware.SecureWithConfig(middleware.SecureConfig{
@@ -33,5 +31,21 @@ func (a *App) setupMiddleware() {
 			c.Response().Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 			return next(c)
 		}
+	})
+}
+
+// csrfMiddleware returns configured CSRF protection middleware
+func (a *App) csrfMiddleware() echo.MiddlewareFunc {
+	return middleware.CSRFWithConfig(middleware.CSRFConfig{
+		TokenLookup:    "form:csrf_token,header:X-CSRF-Token",
+		ContextKey:     csrf.EchoContextKey,
+		CookieName:     "csrf_token",
+		CookiePath:     "/",
+		CookieSecure:   a.Config.Auth.CookieSecure,
+		CookieHTTPOnly: true,
+		CookieSameSite: http.SameSiteStrictMode,
+		TokenLength:    32,
+		// Don't use Skipper - we need tokens to be generated for GET requests
+		// The middleware will only validate tokens for unsafe methods (POST, PUT, PATCH, DELETE)
 	})
 }

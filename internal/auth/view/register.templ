@@ -1,0 +1,49 @@
+package view
+
+import "github.com/tjanas94/vibefeeder/internal/shared/view/components"
+
+// RegisterPage renders the complete registration page with layout
+templ RegisterPage(props RegisterPageProps) {
+	@AuthLayout(AuthLayoutProps{Title: "Sign Up - VibeFeeder"}) {
+		@AuthCard() {
+			@AuthCardTitle("Sign Up")
+			@RegisterForm(props)
+		}
+	}
+}
+
+// RegisterForm renders the registration form component (can be used for htmx swapping)
+templ RegisterForm(props RegisterPageProps) {
+	<form
+		id="register-form"
+		hx-post="/auth/register"
+		hx-target="#register-form"
+		hx-swap="outerHTML"
+		class="space-y-4"
+		novalidate
+	>
+		if props.GeneralError != "" {
+			@components.Alert(components.AlertProps{
+				Type:        "error",
+				ShowIcon:    true,
+				UseOOB:      false,
+				Dismissable: false,
+			}) {
+				{ props.GeneralError }
+			}
+		}
+		@EmailField(props.Email, props.EmailError)
+		@PasswordField(props.PasswordError)
+		@PasswordConfirmField(props.PasswordConfirmError)
+		if props.RequireCode {
+			@RegistrationCodeField(props.RegistrationCode, props.RegistrationCodeError)
+		}
+		@SubmitButton("Sign up")
+		<div class="divider">or</div>
+		<div class="text-center">
+			<span class="text-sm">Already have an account?</span>
+			{ " " }
+			@AuthLink("/auth/login", "Log in")
+		</div>
+	</form>
+}

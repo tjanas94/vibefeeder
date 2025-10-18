@@ -1,6 +1,10 @@
 package components
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/tjanas94/vibefeeder/internal/shared/csrf"
+)
 
 // Navbar renders the top navigation bar for authenticated users.
 // This component accepts:
@@ -26,10 +30,12 @@ templ Navbar(props NavbarProps) {
 			<button
 				class="btn btn-ghost hover:btn-neutral"
 				hx-post="/auth/logout"
+				hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrf.Token(ctx)) }
 				hx-trigger="click"
 				hx-swap="none"
 				aria-label="Log out of the application"
 			>
+				@ButtonLoader(ButtonLoaderProps{})
 				<span class="sm:hidden text-xl" aria-hidden="true">→</span>
 				<span class="hidden sm:inline">→ Log out</span>
 			</button>

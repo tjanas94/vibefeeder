@@ -14,7 +14,6 @@ Wymagania funkcjonalne dla wersji MVP produktu VibeFeeder są następujące:
 
 1.  Zarządzanie kontem użytkownika:
     - Użytkownicy muszą mieć możliwość założenia konta za pomocą adresu e-mail i hasła.
-    - Proces rejestracji musi wymagać akceptacji polityki prywatności.
     - Użytkownicy muszą mieć możliwość zalogowania się do aplikacji i wylogowania się z niej.
 
 2.  Zarządzanie feedami RSS:
@@ -52,16 +51,16 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 ---
 
 - ID: US-001
-- Tytuł: Rejestracja nowego użytkownika
-- Opis: Jako nowy użytkownik, chcę móc założyć konto w aplikacji przy użyciu mojego adresu e-mail i hasła, abym mógł zacząć korzystać z usługi.
+- Tytuł: Rejestracja nowego użytkownika z weryfikacją e-mail
+- Opis: Jako nowy użytkownik, chcę móc założyć konto przy użyciu mojego adresu e-mail, abym po jego weryfikacji mógł bezpiecznie korzystać z aplikacji i w razie potrzeby odzyskać do niej dostęp.
 - Kryteria akceptacji:
   1.  Formularz rejestracji zawiera pola na adres e-mail, hasło oraz potwierdzenie hasła.
-  2.  Formularz zawiera pole wyboru (checkbox) do akceptacji polityki prywatności, które jest wymagane.
-  3.  Walidacja po stronie klienta i serwera sprawdza, czy podany e-mail ma poprawny format.
-  4.  Walidacja sprawdza, czy hasła w obu polach są identyczne.
-  5.  Po pomyślnej rejestracji użytkownik jest automatycznie zalogowany i przekierowany do głównego widoku aplikacji.
-  6.  W przypadku, gdy konto o podanym adresie e-mail już istnieje, wyświetlany jest stosowny komunikat o błędzie.
-  7.  Zdarzenie `user_registered` jest zapisywane w wewnętrznej bazie danych.
+  2.  Walidacja po stronie klienta i serwera sprawdza, czy podany e-mail ma poprawny format.
+  3.  Walidacja sprawdza, czy hasła w obu polach są identyczne.
+  4.  W przypadku, gdy konto o podanym adresie e-mail już istnieje, wyświetlany jest stosowny komunikat o błędzie.
+  5.  Po pomyślnym przesłaniu formularza, system wysyła na podany adres e-mail unikalny link weryfikacyjny, a interfejs wyświetla komunikat o konieczności sprawdzenia skrzynki pocztowej.
+  6.  Po kliknięciu w link weryfikacyjny, konto użytkownika zostaje aktywowane, a użytkownik jest przekierowywany na stronę logowania z komunikatem potwierdzającym pomyślną weryfikację.
+  7.  Zdarzenie `user_registered` jest zapisywane w wewnętrznej bazie danych po pomyślnym przesłaniu formularza.
 
 ---
 
@@ -71,7 +70,7 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 - Kryteria akceptacji:
   1.  Formularz logowania zawiera pola na adres e-mail i hasło.
   2.  Po poprawnym uwierzytelnieniu użytkownik jest przekierowany do głównego widoku aplikacji.
-  3.  W przypadku podania błędnego e-maila lub hasła, wyświetlany jest jeden, ogólny komunikat o błędzie ("Nieprawidłowy e-mail lub hasło").
+  3.  W przypadku podania błędnego e-maila lub hasła, wyświetlany jest jeden, ogólny komunikat o błędzie ("Invalid email or password").
   4.  Zdarzenie `user_login` jest zapisywane w wewnętrznej bazie danych.
 
 ---
@@ -80,9 +79,24 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 - Tytuł: Wylogowywanie z aplikacji
 - Opis: Jako zalogowany użytkownik, chcę móc się wylogować z aplikacji, aby zabezpieczyć swoje konto na współdzielonym urządzeniu.
 - Kryteria akceptacji:
-  1.  W interfejsie aplikacji znajduje się przycisk lub link "Wyloguj".
+  1.  W interfejsie aplikacji znajduje się przycisk lub link "Log out".
   2.  Po kliknięciu przycisku sesja użytkownika jest kończona.
   3.  Użytkownik jest przekierowywany do strony logowania.
+
+---
+
+- ID: US-012
+- Tytuł: Odzyskiwanie hasła
+- Opis: Jako zarejestrowany użytkownik, który zapomniał swojego hasła, chcę mieć możliwość jego zresetowania, abym mógł odzyskać dostęp do swojego konta.
+- Kryteria akceptacji:
+  1.  Na stronie logowania znajduje się link "Forgot password?".
+  2.  Po kliknięciu linku, użytkownik jest przekierowywany do formularza, w którym podaje swój adres e-mail.
+  3.  Po przesłaniu formularza, system wysyła na podany adres e-mail unikalny, ograniczony czasowo link do zresetowania hasła (jeśli konto istnieje).
+  4.  Użytkownik widzi komunikat informujący o wysłaniu linku (np. "If the account exists, we've sent a password reset link").
+  5.  Po kliknięciu w link z wiadomości e-mail, użytkownik jest przenoszony do formularza zmiany hasła, który zawiera pola "Nowe hasło" i "Potwierdź nowe hasło".
+  6.  Walidacja sprawdza, czy hasła w obu polach są identyczne.
+  7.  Po pomyślnej zmianie hasła, użytkownik jest informowany o sukcesie i przekierowywany na stronę logowania.
+  8.  Zdarzenie `user_password_reset` jest zapisywane w wewnętrznej bazie danych.
 
 ### Zarządzanie feedami RSS
 
@@ -94,7 +108,7 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 - Kryteria akceptacji:
   1.  Gdy lista feedów użytkownika jest pusta, na ekranie głównym wyświetlany jest specjalny widok ("empty state").
   2.  Widok ten zawiera czytelny tekst zachęcający do dodania pierwszego feedu.
-  3.  Widok zawiera wyraźny przycisk lub link "Dodaj feed", który otwiera formularz dodawania nowego źródła.
+  3.  Widok zawiera wyraźny przycisk lub link "Add feed", który otwiera formularz dodawania nowego źródła.
 
 ---
 
@@ -117,7 +131,7 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
   1.  Wszystkie dodane przez użytkownika feedy są wyświetlane w formie listy.
   2.  Każdy element listy pokazuje nazwę feedu.
   3.  Jeśli system napotkał problem podczas ostatniej próby pobrania danych z feedu (np. błąd 404, błąd serwera), obok nazwy feedu wyświetlana jest ikona błędu.
-  4.  Po najechaniu kursorem myszy na ikonę błędu, wyświetla się dymek (tooltip) z krótkim, zrozumiałym opisem problemu (np. "Nie udało się pobrać danych z tego adresu URL").
+  4.  Po najechaniu kursorem myszy na ikonę błędu, wyświetla się dymek (tooltip) z krótkim, zrozumiałym opisem problemu (np. "Failed to fetch data from this URL").
   5.  System zapewnia efektywną nawigację dla dużej liczby feedów (paginacja lub równoważny mechanizm).
 
 ---
@@ -127,10 +141,10 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 - Opis: Jako użytkownik z wieloma feedami, chcę móc szybko znaleźć konkretne źródło lub wyświetlić tylko feedy wymagające uwagi, abym nie musiał przeszukiwać całej listy ręcznie.
 - Kryteria akceptacji:
   1.  Użytkownik może wyszukać feed po nazwie za pomocą pola tekstowego.
-  2.  Użytkownik może filtrować feedy według statusu: "Wszystkie", "Działające", "Z błędami".
+  2.  Użytkownik może filtrować feedy według statusu: "All", "Active", "Pending", "Error".
   3.  Użytkownik może łączyć wyszukiwanie z filtrem statusu.
   4.  Wyszukiwanie i filtrowanie nie wymaga przeładowania całej strony.
-  5.  Gdy brak wyników, wyświetlany jest komunikat "Nie znaleziono feedów".
+  5.  Gdy brak wyników, wyświetlany jest komunikat "No feeds found".
 
 ---
 
@@ -138,8 +152,8 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 - Tytuł: Edycja istniejącego feedu RSS
 - Opis: Jako użytkownik, chcę móc edytować nazwę i adres URL istniejącego feedu, aby poprawić błędy lub zaktualizować źródło.
 - Kryteria akceptacji:
-  1.  Każdy element na liście feedów ma opcję "Edytuj".
-  2.  Kliknięcie "Edytuj" otwiera formularz wypełniony aktualnymi danymi (nazwą i adresem URL) danego feedu.
+  1.  Każdy element na liście feedów ma opcję "Edit".
+  2.  Kliknięcie "Edit" otwiera formularz wypełniony aktualnymi danymi (nazwą i adresem URL) danego feedu.
   3.  Użytkownik może zmienić dane i zapisać je.
   4.  Po zapisaniu, walidacja adresu URL jest wykonywana ponownie, tak jak przy dodawaniu nowego feedu.
   5.  Zaktualizowane dane są widoczne na liście feedów.
@@ -150,8 +164,8 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 - Tytuł: Usuwanie feedu RSS
 - Opis: Jako użytkownik, chcę móc usunąć feed RSS z mojej listy, gdy przestaje mnie on interesować.
 - Kryteria akceptacji:
-  1.  Każdy element na liście feedów ma opcję "Usuń".
-  2.  Po kliknięciu "Usuń", system prosi o potwierdzenie operacji (np. za pomocą okna modalnego "Czy na pewno chcesz usunąć ten feed?").
+  1.  Każdy element na liście feedów ma opcję "Delete".
+  2.  Po kliknięciu "Delete", system prosi o potwierdzenie operacji (np. za pomocą okna modalnego "Are you sure you want to delete this feed?").
   3.  Po potwierdzeniu, feed jest trwale usuwany z listy użytkownika i z systemu.
 
 ### Generowanie podsumowania
@@ -160,9 +174,9 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 
 - ID: US-009
 - Tytuł: Generowanie podsumowania na żądanie
-- Opis: Jako użytkownik, chcę mieć przycisk "Generuj podsumowanie", aby w dowolnym momencie otrzymać streszczenie artykułów z ostatniej doby.
+- Opis: Jako użytkownik, chcę mieć przycisk "Generate summary", aby w dowolnym momencie otrzymać streszczenie artykułów z ostatniej doby.
 - Kryteria akceptacji:
-  1.  W głównym widoku aplikacji znajduje się widoczny przycisk "Generuj podsumowanie".
+  1.  W głównym widoku aplikacji znajduje się widoczny przycisk "Generate summary".
   2.  Przycisk jest aktywny tylko wtedy, gdy użytkownik ma dodany co najmniej jeden poprawnie działający feed.
   3.  Kliknięcie przycisku rozpoczyna proces generowania podsumowania AI z artykułów opublikowanych w ciągu ostatnich 24 godzin.
   4.  Podczas generowania podsumowania, interfejs informuje użytkownika o trwającym procesie (np. poprzez animację ładowania).
@@ -176,7 +190,7 @@ Następujące funkcje i cechy celowo nie wchodzą w zakres wersji MVP, aby zapew
 - Kryteria akceptacji:
   1.  W głównym widoku aplikacji znajduje się dedykowany obszar do wyświetlania podsumowania.
   2.  W tym obszarze wyświetlany jest tekst ostatnio wygenerowanego podsumowania.
-  3.  Nad lub pod tekstem podsumowania widoczna jest data i godzina jego wygenerowania (np. "Wygenerowano: 7.10.2025, 15:30").
+  3.  Nad lub pod tekstem podsumowania widoczna jest data i godzina jego wygenerowania (np. "Generated: 7.10.2025, 15:30").
   4.  Podsumowanie pozostaje widoczne do momentu, aż użytkownik wygeneruje nowe.
 
 ## 6. Metryki sukcesu

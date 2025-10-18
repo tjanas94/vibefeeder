@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Server     ServerConfig
 	Supabase   SupabaseConfig
+	Auth       AuthConfig
 	Log        LogConfig
 	OpenRouter OpenRouterConfig
 	Fetcher    FetcherConfig
@@ -34,6 +35,17 @@ type LogConfig struct {
 type SupabaseConfig struct {
 	URL string
 	Key string
+}
+
+// AuthConfig contains authentication configuration
+type AuthConfig struct {
+	RedirectURL        string        // Base URL for auth redirects (e.g., http://localhost:8080 or https://yourdomain.com)
+	CookieSecure       bool          // Whether to set Secure flag on cookies (true for HTTPS)
+	AccessTokenMaxAge  time.Duration // Max age for access token cookie
+	RefreshTokenMaxAge time.Duration // Max age for refresh token cookie
+	SessionCookieName  string        // Name for session cookie
+	RefreshCookieName  string        // Name for refresh token cookie
+	RegistrationCode   string        // Optional code required for new user registration (if set, registration requires this code)
 }
 
 // OpenRouterConfig contains OpenRouter AI service configuration
@@ -72,6 +84,15 @@ func Load() (*Config, error) {
 		Supabase: SupabaseConfig{
 			URL: os.Getenv("SUPABASE_URL"),
 			Key: os.Getenv("SUPABASE_KEY"),
+		},
+		Auth: AuthConfig{
+			RedirectURL:        getEnvOrDefault("AUTH_REDIRECT_URL", "http://localhost:8080"),
+			CookieSecure:       getEnvOrDefault("AUTH_COOKIE_SECURE", "false") == "true",
+			AccessTokenMaxAge:  getDurationSeconds("AUTH_ACCESS_TOKEN_MAX_AGE", 3600),    // 1 hour
+			RefreshTokenMaxAge: getDurationSeconds("AUTH_REFRESH_TOKEN_MAX_AGE", 604800), // 7 days
+			SessionCookieName:  getEnvOrDefault("AUTH_SESSION_COOKIE_NAME", "vibefeeder_session"),
+			RefreshCookieName:  getEnvOrDefault("AUTH_REFRESH_COOKIE_NAME", "vibefeeder_refresh"),
+			RegistrationCode:   os.Getenv("AUTH_REGISTRATION_CODE"), // Optional - empty means open registration
 		},
 		Log: LogConfig{
 			Level:  getEnvOrDefault("LOG_LEVEL", "info"),

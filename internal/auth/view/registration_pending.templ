@@ -1,0 +1,20 @@
+package view
+
+// RegistrationPending renders a success message after registration, prompting user to check email
+templ RegistrationPending(props RegistrationPendingProps) {
+	<div id="register-form">
+		@AuthCard() {
+			<div class="text-center space-y-4">
+				<div class="text-6xl" aria-hidden="true">✉️</div>
+				<h2 class="text-2xl font-bold">Check your email</h2>
+				<p class="text-base-content/70">
+					We've sent a message to <strong>{ props.Email }</strong>.
+					Click the verification link to complete your registration.
+				</p>
+				<div class="pt-4">
+					@AuthLink("/auth/login", "Back to login")
+				</div>
+			</div>
+		}
+	</div>
+}

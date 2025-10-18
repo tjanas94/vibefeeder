@@ -1,0 +1,14 @@
+<html>
+  <body>
+    <h2>Reset Your Password</h2>
+    <p>
+      Someone requested a password reset for your account. If this was you, click the link below to
+      reset your password:
+    </p>
+    <p><a href="{{ .SiteURL }}/auth/reset-password?token={{ .TokenHash }}">Reset Password</a></p>
+    <p>Or copy and paste this URL into your browser:</p>
+    <p>{{ .SiteURL }}/auth/reset-password?token={{ .TokenHash }}</p>
+    <p>If you didn't request this, you can safely ignore this email.</p>
+    <p>This link will expire in 1 hour.</p>
+  </body>
+</html>

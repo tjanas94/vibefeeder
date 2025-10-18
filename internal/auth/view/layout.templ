@@ -1,0 +1,15 @@
+package view
+
+import sharedView "github.com/tjanas94/vibefeeder/internal/shared/view"
+
+// AuthLayout renders a centered container for authentication forms.
+// It uses the shared Layout but provides a minimal, centered design without navigation.
+templ AuthLayout(props AuthLayoutProps) {
+	@sharedView.Layout(sharedView.LayoutProps{Title: props.Title}) {
+		<main id="main-content" class="min-h-screen flex items-center justify-center" role="main">
+			<div class="w-full max-w-md px-4">
+				{ children... }
+			</div>
+		</main>
+	}
+}

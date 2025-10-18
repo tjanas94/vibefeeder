@@ -76,7 +76,8 @@ func (r *Repository) UpdateFeedAfterFetch(ctx context.Context, feedID string, up
 }
 
 // InsertArticles inserts multiple articles into the database
-// Uses ON CONFLICT DO NOTHING to skip duplicates based on (feed_id, url) unique constraint
+// Uses upsert with ON CONFLICT to skip duplicates based on (feed_id, url) unique constraint
+// Setting upsert=true with onConflict tells PostgREST to use ON CONFLICT DO NOTHING behavior
 func (r *Repository) InsertArticles(ctx context.Context, articles []database.PublicArticlesInsert) error {
 	if len(articles) == 0 {
 		return nil
@@ -84,7 +85,7 @@ func (r *Repository) InsertArticles(ctx context.Context, articles []database.Pub
 
 	var result []database.PublicArticlesSelect
 	_, err := r.db.From("articles").
-		Insert(articles, false, "", "", "").
+		Insert(articles, true, "feed_id,url", "", "").
 		ExecuteTo(&result)
 
 	if err != nil {

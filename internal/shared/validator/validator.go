@@ -101,6 +101,8 @@ func formatFieldError(err validator.FieldError) string {
 		return "Must be a valid UUID"
 	case "datetime":
 		return fmt.Sprintf("Must be a valid datetime in format %s", param)
+	case "eqfield":
+		return fmt.Sprintf("Must match %s", param)
 	default:
 		return fmt.Sprintf("Failed validation: %s", tag)
 	}

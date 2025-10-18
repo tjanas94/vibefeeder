@@ -1,0 +1,64 @@
+package view
+
+import "github.com/tjanas94/vibefeeder/internal/shared/view/components"
+
+// LoginPage renders the complete login page with layout
+templ LoginPage(props LoginPageProps) {
+	@AuthLayout(AuthLayoutProps{Title: "Login - VibeFeeder"}) {
+		if props.ShowConfirmedToast {
+			@components.Toast(components.ToastProps{
+				Type:     "success",
+				Message:  "Account confirmed. You can now log in.",
+				Duration: 5000,
+				UseOOB:   true,
+			})
+		}
+		if props.ShowResetSuccessToast {
+			@components.Toast(components.ToastProps{
+				Type:     "success",
+				Message:  "Password changed. You can now log in.",
+				Duration: 5000,
+				UseOOB:   true,
+			})
+		}
+		@AuthCard() {
+			@AuthCardTitle("Login")
+			@LoginForm(props)
+		}
+	}
+}
+
+// LoginForm renders the login form component (can be used for htmx swapping)
+templ LoginForm(props LoginPageProps) {
+	<form
+		id="login-form"
+		hx-post="/auth/login"
+		hx-target="#login-form"
+		hx-swap="outerHTML"
+		class="space-y-4"
+		novalidate
+	>
+		if props.GeneralError != "" {
+			@components.Alert(components.AlertProps{
+				Type:        "error",
+				ShowIcon:    true,
+				UseOOB:      false,
+				Dismissable: false,
+			}) {
+				{ props.GeneralError }
+			}
+		}
+		@EmailField(props.Email, props.EmailError)
+		@PasswordField(props.PasswordError)
+		<div class="flex justify-between items-center">
+			@AuthLink("/auth/forgot-password", "Forgot password?")
+		</div>
+		@SubmitButton("Log in")
+		<div class="divider">or</div>
+		<div class="text-center">
+			<span class="text-sm">Don't have an account?</span>
+			{ " " }
+			@AuthLink("/auth/register", "Sign up")
+		</div>
+	</form>
+}

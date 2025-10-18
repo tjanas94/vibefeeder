@@ -8,6 +8,7 @@ import (
 	"github.com/tjanas94/vibefeeder/internal/dashboard/models"
 	"github.com/tjanas94/vibefeeder/internal/dashboard/view"
 	feedmodels "github.com/tjanas94/vibefeeder/internal/feed/models"
+	"github.com/tjanas94/vibefeeder/internal/shared/auth"
 )
 
 // Handler handles dashboard requests
@@ -25,9 +26,8 @@ func NewHandler(logger *slog.Logger) *Handler {
 // ShowDashboard renders the main dashboard page
 // Returns empty layout with htmx-enabled containers that load content dynamically
 func (h *Handler) ShowDashboard(c echo.Context) error {
-	// TODO: Fetch actual user data from database when user service is implemented
-	// For now, use mock email based on user ID
-	mockEmail := "user@example.com"
+	// Get authenticated user email from context
+	userEmail := auth.GetUserEmail(c)
 
 	// Bind and validate query params using the same struct as GET /feeds
 	query := new(feedmodels.ListFeedsQuery)
@@ -49,7 +49,7 @@ func (h *Handler) ShowDashboard(c echo.Context) error {
 	// Prepare view model
 	vm := models.DashboardViewModel{
 		Title:     "Dashboard - VibeFeeder",
-		UserEmail: mockEmail,
+		UserEmail: userEmail,
 		Query:     query,
 	}
 

@@ -23,7 +23,7 @@ type FeedItemViewModel struct {
 	ID            string    `json:"id"`
 	Name          string    `json:"name"`
 	URL           string    `json:"url"`
-	HasError      bool      `json:"has_error"`     // Computed: LastFetchError != nil
+	HasError      bool      `json:"has_error"`     // Computed: LastFetchStatus is 'permanent_error' or 'temporary_error'
 	ErrorMessage  string    `json:"error_message"` // From last_fetch_error
 	LastFetchedAt time.Time `json:"last_fetched_at"`
 }
@@ -49,7 +49,7 @@ type FeedFormErrorViewModel struct {
 }
 
 // NewFeedItemFromDB creates a FeedItemViewModel from database.PublicFeedsSelect.
-// Computes HasError from LastFetchError and parses timestamps.
+// Computes HasError from last_fetch_status and parses timestamps.
 func NewFeedItemFromDB(dbFeed database.PublicFeedsSelect) FeedItemViewModel {
 	vm := FeedItemViewModel{
 		ID:   dbFeed.Id,
@@ -57,10 +57,15 @@ func NewFeedItemFromDB(dbFeed database.PublicFeedsSelect) FeedItemViewModel {
 		URL:  dbFeed.Url,
 	}
 
-	// Compute HasError from last_fetch_error
-	if dbFeed.LastFetchError != nil && *dbFeed.LastFetchError != "" {
-		vm.HasError = true
-		vm.ErrorMessage = *dbFeed.LastFetchError
+	// Compute HasError from last_fetch_status
+	if dbFeed.LastFetchStatus != nil {
+		status := *dbFeed.LastFetchStatus
+		if status == "permanent_error" || status == "temporary_error" {
+			vm.HasError = true
+			if dbFeed.LastFetchError != nil {
+				vm.ErrorMessage = *dbFeed.LastFetchError
+			}
+		}
 	}
 
 	// Parse last_fetched_at timestamp

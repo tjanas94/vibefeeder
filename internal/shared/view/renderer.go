@@ -5,6 +5,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
+	"github.com/tjanas94/vibefeeder/internal/shared/csrf"
 )
 
 // TemplRenderer implements echo.Renderer interface for Templ components
@@ -27,7 +28,13 @@ func (t *TemplRenderer) Render(w io.Writer, name string, data interface{}, c ech
 	buf := templ.GetBuffer()
 	defer templ.ReleaseBuffer(buf)
 
-	if err := component.Render(c.Request().Context(), buf); err != nil {
+	// Create a new context with CSRF token from Echo context
+	ctx := c.Request().Context()
+	if csrfToken, ok := c.Get(csrf.EchoContextKey).(string); ok && csrfToken != "" {
+		ctx = csrf.WithToken(ctx, csrfToken)
+	}
+
+	if err := component.Render(ctx, buf); err != nil {
 		return err
 	}
 

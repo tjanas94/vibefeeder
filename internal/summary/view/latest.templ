@@ -5,6 +5,7 @@ import (
 	"html"
 	"time"
 
+	"github.com/tjanas94/vibefeeder/internal/shared/csrf"
 	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 )
@@ -26,6 +27,7 @@ templ GenerateSummaryAction(props GenerateSummaryActionProps) {
 		hx-swap="innerHTML"
 		class="inline-flex items-center gap-2 min-h-[2.75rem]"
 	>
+		<input type="hidden" name="csrf_token" value={ csrf.Token(ctx) }/>
 		<button
 			type="submit"
 			class={ "btn btn-primary hide-during-request", props.ButtonSize }

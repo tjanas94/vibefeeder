@@ -41,10 +41,6 @@ func NewHandler(service *Service, logger *slog.Logger, feedFetcher FeedFetcher) 
 func (h *Handler) ListFeeds(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		return echo.NewHTTPError(http.StatusUnauthorized, "Authentication required")
-	}
 
 	// Bind and validate query parameters
 	query := new(models.ListFeedsQuery)
@@ -113,13 +109,6 @@ func (h *Handler) ListFeeds(c echo.Context) error {
 // HandleFeedAddForm handles GET /feeds/new endpoint
 // Returns an HTML form for adding a new feed
 func (h *Handler) HandleFeedAddForm(c echo.Context) error {
-	// Get user ID from authenticated session (check auth first)
-	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		return echo.NewHTTPError(http.StatusUnauthorized, "Authentication required")
-	}
-
 	// Create view model for adding a new feed
 	vm := models.NewFeedFormForAdd()
 
@@ -133,14 +122,6 @@ func (h *Handler) HandleFeedAddForm(c echo.Context) error {
 func (h *Handler) CreateFeed(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		errorVM := models.FeedFormErrorViewModel{
-			GeneralError: "Authentication required",
-		}
-		vm := models.NewFeedFormWithErrors("add", "", "", "", errorVM)
-		return c.Render(http.StatusUnauthorized, "", view.FeedForm(vm))
-	}
 
 	// Bind form data to command
 	cmd := new(models.CreateFeedCommand)
@@ -205,10 +186,6 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 	// Get user ID from authenticated session (check auth first)
 	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		return echo.NewHTTPError(http.StatusUnauthorized, "Authentication required")
-	}
 
 	// Get and validate feed ID from path parameter
 	feedID, err := h.getFeedID(c)
@@ -240,14 +217,6 @@ func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 func (h *Handler) HandleUpdate(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		errorVM := models.FeedFormErrorViewModel{
-			GeneralError: "Authentication required",
-		}
-		vm := models.NewFeedFormWithErrors("edit", "", "", "", errorVM)
-		return c.Render(http.StatusUnauthorized, "", view.FeedForm(vm))
-	}
 
 	// Get and validate feed ID from path parameter
 	feedID, err := h.getFeedID(c)
@@ -331,10 +300,6 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 func (h *Handler) HandleDeleteConfirmation(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		return echo.NewHTTPError(http.StatusUnauthorized, "Authentication required")
-	}
 
 	// Get and validate feed ID from path parameter
 	feedID, err := h.getFeedID(c)
@@ -372,15 +337,6 @@ func (h *Handler) HandleDeleteConfirmation(c echo.Context) error {
 func (h *Handler) DeleteFeed(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
-	if userID == "" {
-		h.logger.Error("missing user_id in context")
-		vm := models.DeleteConfirmationViewModel{
-			FeedID:       c.Param("id"),
-			FeedName:     "",
-			ErrorMessage: "Authentication required",
-		}
-		return c.Render(http.StatusUnauthorized, "", view.DeleteConfirmation(vm))
-	}
 
 	// Get and validate feed ID from path parameter
 	feedID, err := h.getFeedID(c)
