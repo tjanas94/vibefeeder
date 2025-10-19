@@ -9,7 +9,7 @@ type LoginRequest struct {
 // RegisterRequest represents the registration form data
 type RegisterRequest struct {
 	Email            string `form:"email" validate:"required,email"`
-	Password         string `form:"password" validate:"required,min=8"`
+	Password         string `form:"password" validate:"required,strongpassword=50"`
 	PasswordConfirm  string `form:"password_confirm" validate:"required,eqfield=Password"`
 	RegistrationCode string `form:"registration_code"` // Validation handled in service based on config
 }
@@ -22,7 +22,7 @@ type ForgotPasswordRequest struct {
 // ResetPasswordRequest represents the reset password form data
 type ResetPasswordRequest struct {
 	Token           string `form:"token" validate:"required"`
-	Password        string `form:"password" validate:"required,min=8"`
+	Password        string `form:"password" validate:"required,strongpassword=50"`
 	PasswordConfirm string `form:"password_confirm" validate:"required,eqfield=Password"`
 }
 

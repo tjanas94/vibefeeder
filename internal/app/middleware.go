@@ -12,7 +12,7 @@ import (
 // setupMiddleware configures all application middleware
 func (a *App) setupMiddleware() {
 	// Core middleware
-	a.Echo.Use(logger.RequestLoggerConfig(a.Logger))
+	a.Echo.Use(logger.RequestLoggerConfig(a.Container.Logger))
 	a.Echo.Use(middleware.Recover())
 	a.Echo.Use(middleware.BodyLimit("2M"))
 
@@ -41,7 +41,7 @@ func (a *App) csrfMiddleware() echo.MiddlewareFunc {
 		ContextKey:     csrf.EchoContextKey,
 		CookieName:     "csrf_token",
 		CookiePath:     "/",
-		CookieSecure:   a.Config.Auth.CookieSecure,
+		CookieSecure:   a.Container.Config.Auth.CookieSecure,
 		CookieHTTPOnly: true,
 		CookieSameSite: http.SameSiteStrictMode,
 		TokenLength:    32,

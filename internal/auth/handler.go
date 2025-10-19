@@ -34,6 +34,21 @@ func (h *Handler) ShowLoginPage(c echo.Context) error {
 		ShowConfirmedToast:    c.QueryParam("confirmed") == "true",
 		ShowResetSuccessToast: c.QueryParam("reset_success") == "true",
 	}
+
+	// Handle confirmation errors
+	errorParam := c.QueryParam("error")
+	if errorParam != "" {
+		props.ShowErrorAlert = true
+		switch errorParam {
+		case "missing_token":
+			props.ErrorMessage = "Invalid confirmation link. Please check your email and try again."
+		case "invalid_token":
+			props.ErrorMessage = "Confirmation link is invalid or expired. Please register again or contact support."
+		default:
+			props.ErrorMessage = "An error occurred during confirmation. Please try again."
+		}
+	}
+
 	return c.Render(http.StatusOK, "", view.LoginPage(props))
 }
 
@@ -123,8 +138,6 @@ func (h *Handler) HandleRegister(c echo.Context) error {
 		switch err {
 		case ErrUserAlreadyExists:
 			props.EmailError = "User with this email already exists"
-		case ErrWeakPassword:
-			props.PasswordError = "Password is too weak"
 		case ErrInvalidRegistrationCode:
 			props.RegistrationCodeError = "Invalid registration code"
 		default:
@@ -142,9 +155,20 @@ func (h *Handler) HandleRegister(c echo.Context) error {
 
 // HandleConfirm handles email confirmation redirect
 func (h *Handler) HandleConfirm(c echo.Context) error {
-	// Supabase automatically handles the token verification and redirects here
-	// We just need to redirect the user to login page with confirmation message
-	c.Response().Header().Set("HX-Redirect", "/auth/login?confirmed=true")
+	// Get token from query parameter
+	token := c.QueryParam("token")
+	if token == "" {
+		h.logger.Error("Email confirmation failed: missing token")
+		return c.Redirect(http.StatusFound, "/auth/login?error=missing_token")
+	}
+
+	// Verify the email confirmation token
+	if err := h.service.VerifyEmailConfirmation(c.Request().Context(), token); err != nil {
+		h.logger.Error("Email confirmation failed", "error", err)
+		return c.Redirect(http.StatusFound, "/auth/login?error=invalid_token")
+	}
+
+	// Redirect to login page with confirmation message
 	return c.Redirect(http.StatusFound, "/auth/login?confirmed=true")
 }
 
@@ -239,15 +263,15 @@ func (h *Handler) HandleResetPassword(c echo.Context) error {
 		return c.Render(http.StatusUnprocessableEntity, "", view.ResetPasswordForm(props))
 	}
 
-	// Attempt password reset (service will validate password then verify token)
+	// Attempt password reset
 	if err := h.service.ResetPassword(c.Request().Context(), req.Token, req.Password); err != nil {
 		props := view.ResetPasswordPageProps{
 			Token: req.Token,
 		}
 
 		switch err {
-		case ErrWeakPassword:
-			props.PasswordError = "Password is too weak"
+		case ErrSamePassword:
+			props.PasswordError = "New password must be different from your current password"
 			return c.Render(http.StatusUnprocessableEntity, "", view.ResetPasswordForm(props))
 		case ErrInvalidToken:
 			props.GeneralError = "Password reset link is invalid or expired. Please request a new one."

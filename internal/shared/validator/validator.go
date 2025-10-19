@@ -9,6 +9,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	passwordvalidator "github.com/wagslane/go-password-validator"
 )
 
 // CustomValidator wraps the go-playground validator
@@ -22,6 +23,9 @@ func New() *CustomValidator {
 
 	// Register custom validation for http/https URLs
 	_ = v.RegisterValidation("httpurl", validateHTTPURL)
+
+	// Register custom validation for strong passwords
+	_ = v.RegisterValidation("strongpassword", validateStrongPassword)
 
 	return &CustomValidator{
 		validator: v,
@@ -39,6 +43,29 @@ func validateHTTPURL(fl validator.FieldLevel) bool {
 
 	scheme := strings.ToLower(parsedURL.Scheme)
 	return scheme == "http" || scheme == "https"
+}
+
+// validateStrongPassword validates password strength using entropy
+// Tag format: strongpassword=50 (where 50 is minimum entropy in bits)
+func validateStrongPassword(fl validator.FieldLevel) bool {
+	password := fl.Field().String()
+
+	// Get entropy parameter from tag (e.g., "strongpassword=50")
+	entropyParam := fl.Param()
+	if entropyParam == "" {
+		// Default to 50 bits if no parameter provided
+		entropyParam = "50"
+	}
+
+	// Parse entropy value
+	var minEntropy float64
+	if _, err := fmt.Sscanf(entropyParam, "%f", &minEntropy); err != nil {
+		return false
+	}
+
+	// Validate password entropy
+	err := passwordvalidator.Validate(password, minEntropy)
+	return err == nil
 }
 
 // Validate validates a struct based on validation tags
@@ -81,6 +108,8 @@ func formatFieldError(err validator.FieldError) string {
 		return "Must be a valid URL"
 	case "httpurl":
 		return "Must be a valid HTTP or HTTPS URL"
+	case "strongpassword":
+		return "Make password longer or add numbers and symbols"
 	case "min":
 		return fmt.Sprintf("Must be at least %s characters long", param)
 	case "max":

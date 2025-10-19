@@ -13,6 +13,8 @@ type LoginPageProps struct {
 	GeneralError          string
 	ShowConfirmedToast    bool
 	ShowResetSuccessToast bool
+	ShowErrorAlert        bool   // Show error alert for confirmation errors
+	ErrorMessage          string // Error message to display in alert
 }
 
 // RegisterPageProps contains the data needed to render the registration page

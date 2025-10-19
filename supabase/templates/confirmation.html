@@ -6,10 +6,10 @@
       registration.
     </p>
     <p>
-      <a href="{{ .ConfirmationURL }}/auth/confirm">Confirm Email Address</a>
+      <a href="{{ .SiteURL }}/auth/confirm?token={{ .TokenHash }}">Confirm Email Address</a>
     </p>
     <p>Or copy and paste this URL into your browser:</p>
-    <p>{{ .ConfirmationURL }}/auth/confirm</p>
+    <p>{{ .SiteURL }}/auth/confirm?token={{ .TokenHash }}</p>
     <p>If you didn't create an account, you can safely ignore this email.</p>
   </body>
 </html>

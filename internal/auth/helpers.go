@@ -23,6 +23,17 @@ func isUserExistsError(err error) bool {
 	}
 
 	errMsg := err.Error()
-	return strings.Contains(errMsg, "already registered") ||
-		strings.Contains(errMsg, "email address already")
+	return strings.Contains(errMsg, "user_already_exists") ||
+		strings.Contains(errMsg, "User already registered")
+}
+
+// isSamePasswordError checks if the error indicates user tried to change password to the same value
+func isSamePasswordError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "same_password") ||
+		strings.Contains(errMsg, "should be different from the old password")
 }

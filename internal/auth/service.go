@@ -11,13 +11,6 @@ import (
 	"github.com/tjanas94/vibefeeder/internal/shared/config"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
 	"github.com/tjanas94/vibefeeder/internal/shared/events"
-	passwordvalidator "github.com/wagslane/go-password-validator"
-)
-
-const (
-	// Password entropy requirement (bits)
-	// 50 bits is approximately equivalent to 8 characters with 2 out of 3 character classes
-	minPasswordEntropy = 50
 )
 
 // Service handles authentication business logic
@@ -38,27 +31,12 @@ func NewService(authClient gotrue.Client, eventRepo events.EventRepository, cfg 
 	}
 }
 
-// validatePassword checks if password meets strength requirements
-func (s *Service) validatePassword(password string) error {
-	err := passwordvalidator.Validate(password, minPasswordEntropy)
-	if err != nil {
-		s.logger.Debug("Password validation failed", "error", err)
-		return ErrWeakPassword
-	}
-	return nil
-}
-
 // Register creates a new user account
 func (s *Service) Register(ctx context.Context, req models.RegisterRequest) error {
 	// Validate registration code if configured (constant-time comparison to prevent timing attacks)
 	if !validateRegistrationCode(req.RegistrationCode, s.config.RegistrationCode) {
 		s.logger.Debug("Invalid registration code attempt", "email", req.Email)
 		return ErrInvalidRegistrationCode
-	}
-
-	// Validate password strength
-	if err := s.validatePassword(req.Password); err != nil {
-		return err
 	}
 
 	// Build redirect URL for email confirmation
@@ -76,6 +54,7 @@ func (s *Service) Register(ctx context.Context, req models.RegisterRequest) erro
 	if err != nil {
 		// Check if user already exists
 		if isUserExistsError(err) {
+			s.logger.Debug("User registration attempt with existing email", "email", req.Email)
 			return ErrUserAlreadyExists
 		}
 		s.logger.Error("Failed to register user", "error", err, "email", req.Email)
@@ -237,13 +216,54 @@ func (s *Service) verifyRecoveryToken(ctx context.Context, tokenHash string) (*m
 	}, nil
 }
 
-// ResetPassword resets the user's password using a recovery token
-func (s *Service) ResetPassword(ctx context.Context, tokenHash, newPassword string) error {
-	// Validate password strength first (fail fast before expensive token verification)
-	if err := s.validatePassword(newPassword); err != nil {
-		return err
+// VerifyEmailConfirmation verifies an email confirmation token from signup
+func (s *Service) VerifyEmailConfirmation(ctx context.Context, tokenHash string) error {
+	// Build redirect URL
+	redirectURL := fmt.Sprintf("%s/auth/confirm", s.config.RedirectURL)
+
+	// Verify the token using Supabase Auth's verify endpoint
+	resp, err := s.authClient.Verify(types.VerifyRequest{
+		Type:       "signup",
+		Token:      tokenHash,
+		RedirectTo: redirectURL,
+	})
+
+	if err != nil {
+		s.logger.Error("Failed to verify email confirmation token", "error", err)
+		return ErrInvalidToken
 	}
 
+	// Check if verification was successful
+	if resp.Error != "" {
+		s.logger.Error("Email confirmation failed", "error", resp.Error, "error_code", resp.ErrorCode)
+		return ErrInvalidToken
+	}
+
+	// Get user information using the access token
+	client := s.authClient.WithToken(resp.AccessToken)
+	user, err := client.GetUser()
+	if err != nil {
+		s.logger.Error("Failed to get user after email confirmation", "error", err)
+		return ErrInvalidToken
+	}
+
+	userID := user.ID.String()
+	s.logger.Info("Email confirmed successfully", "user_id", userID, "email", user.Email)
+
+	// Log email confirmation event
+	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
+		UserId:    &userID,
+		EventType: events.EventUserEmailConfirmed,
+		Metadata:  nil,
+	}); err != nil {
+		s.logger.Error("Failed to log event", "event_type", events.EventUserEmailConfirmed, "error", err, "user_id", userID)
+	}
+
+	return nil
+}
+
+// ResetPassword resets the user's password using a recovery token
+func (s *Service) ResetPassword(ctx context.Context, tokenHash, newPassword string) error {
 	// Verify recovery token and get temporary access token
 	session, err := s.verifyRecoveryToken(ctx, tokenHash)
 	if err != nil {
@@ -259,6 +279,11 @@ func (s *Service) ResetPassword(ctx context.Context, tokenHash, newPassword stri
 	})
 
 	if err != nil {
+		// Check if user tried to use the same password
+		if isSamePasswordError(err) {
+			s.logger.Debug("User attempted to reset password to the same value", "user_id", session.UserID)
+			return ErrSamePassword
+		}
 		s.logger.Error("Failed to reset password", "error", err)
 		return ErrInvalidToken
 	}

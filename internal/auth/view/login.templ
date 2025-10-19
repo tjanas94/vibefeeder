@@ -21,6 +21,14 @@ templ LoginPage(props LoginPageProps) {
 				UseOOB:   true,
 			})
 		}
+		if props.ShowErrorAlert {
+			@components.Toast(components.ToastProps{
+				Type:     "error",
+				Message:  props.ErrorMessage,
+				Duration: 7000,
+				UseOOB:   true,
+			})
+		}
 		@AuthCard() {
 			@AuthCardTitle("Login")
 			@LoginForm(props)

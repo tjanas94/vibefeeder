@@ -42,7 +42,7 @@ Interakcje w formularzach będą realizowane z użyciem htmx, co pozwoli na dyna
 
 #### 2.2.1. Rejestracja z Weryfikacją E-mail (US-001)
 
-Proces został podzielony na trzy główne kroki.
+Proces został podzielony na dwa główne kroki.
 
 1.  **Krok 1: Przesłanie formularza rejestracyjnego**
     - **Widok:** `auth/view/register.templ` renderuje formularz z polami: e-mail, hasło, potwierdzenie hasła i opcjonalnie kod rejestracyjny (jeśli jest wymagany przez konfigurację `AUTH_REGISTRATION_CODE`).
@@ -52,13 +52,11 @@ Proces został podzielony na trzy główne kroki.
       - **Błąd:** W przypadku błędu walidacji (np. hasła niezgodne, e-mail zajęty, nieprawidłowy kod rejestracyjny), serwer zwraca kod `422 Unprocessable Entity` i ponownie renderuje komponent formularza z odpowiednimi komunikatami błędów.
       - **Sukces:** Serwer zwraca kod `200 OK`. Formularz zostaje zastąpiony komunikatem dla użytkownika (np. z widoku `auth/view/registration_pending.templ`) o konieczzości sprawdzenia skrzynki mailowej w celu dokończenia procesu. Użytkownik nie jest na tym etapie zalogowany.
 
-2.  **Krok 2: Weryfikacja adresu e-mail**
-    - **Interakcja:** Użytkownik klika unikalny link weryfikacyjny otrzymany w wiadomości e-mail. Powoduje to wysłanie żądania `GET` na predefiniowany w systemie autentykacji adres URL, który finalnie przekierowuje użytkownika na `GET /auth/confirm`.
-
-3.  **Krok 3: Finalizacja rejestracji**
-    - **Interakcja:** Handler obsługujący ścieżkę `GET /auth/confirm` nie renderuje widoku.
-    - **Odpowiedź serwera:** Serwer zwraca odpowiedź z nagłówkiem `HX-Redirect: /auth/login?confirmed=true`.
-    - **Efekt końcowy:** Użytkownik zostaje przekierowany na stronę logowania, gdzie wyświetlony jest toast z komunikatem o pomyślnym potwierdzeniu konta.
+2.  **Krok 2: Finalizacja rejestracji**
+    - **Widok:** Użytkownik, klikając w link z e-maila, trafia na `GET /auth/confirm?token=...`. Serwer weryfikuje token przez Supabase Auth API, loguje event `user_email_confirmed`.
+    - **Odpowiedź:**
+      - **Błąd:** `302 Found` z przekierowaniem na `/auth/login?error=missing_token` lub `/auth/login?error=invalid_token` → wyświetlenie toasta z odpowiednim komunikatem błędu.
+      - **Sukces:** `302 Found` z przekierowaniem na `/auth/login?confirmed=true` → wyświetlenie toasta z komunikatem o pomyślnym potwierdzeniu konta.
 
 #### 2.2.2. Logowanie (US-002)
 
@@ -107,7 +105,7 @@ Proces został podzielony na trzy główne kroki.
 - `POST /auth/login`: Przetwarza logowanie.
 - `GET /auth/register`: Renderuje stronę rejestracji.
 - `POST /auth/register`: Przetwarza rejestrację.
-- `GET /auth/confirm`: Obsługuje przekierowanie po weryfikacji e-mail i finalizuje proces rejestracji.
+- `GET /auth/confirm`: Finalizuje proces rejestracji (oczekuje tokenu w query params).
 - `POST /auth/logout`: Przetwarza wylogowanie.
 - `GET /auth/forgot-password`: Renderuje stronę do resetu hasła.
 - `POST /auth/forgot-password`: Wysyła e-mail z linkiem do resetu.
