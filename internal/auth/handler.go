@@ -57,11 +57,6 @@ func (h *Handler) HandleLogin(c echo.Context) error {
 			PasswordError: fieldErrors["Password"],
 		}
 
-		// If no field-specific errors, show general error
-		if props.EmailError == "" && props.PasswordError == "" {
-			props.GeneralError = "Please correct the errors in the form"
-		}
-
 		return c.Render(http.StatusUnprocessableEntity, "", view.LoginForm(props))
 	}
 
@@ -114,17 +109,6 @@ func (h *Handler) HandleRegister(c echo.Context) error {
 			RequireCode:          h.requireRegCode,
 		}
 
-		return c.Render(http.StatusUnprocessableEntity, "", view.RegisterForm(props))
-	}
-
-	// Validate password strength
-	if err := h.service.ValidatePassword(req.Password); err != nil {
-		props := view.RegisterPageProps{
-			Email:            req.Email,
-			RegistrationCode: req.RegistrationCode,
-			PasswordError:    "Password is too weak",
-			RequireCode:      h.requireRegCode,
-		}
 		return c.Render(http.StatusUnprocessableEntity, "", view.RegisterForm(props))
 	}
 
@@ -255,41 +239,23 @@ func (h *Handler) HandleResetPassword(c echo.Context) error {
 		return c.Render(http.StatusUnprocessableEntity, "", view.ResetPasswordForm(props))
 	}
 
-	// Validate password strength
-	if err := h.service.ValidatePassword(req.Password); err != nil {
-		props := view.ResetPasswordPageProps{
-			Token:         req.Token,
-			PasswordError: "Password is too weak",
-		}
-		return c.Render(http.StatusUnprocessableEntity, "", view.ResetPasswordForm(props))
-	}
-
-	// Verify recovery token and get temporary access token
-	session, err := h.service.VerifyRecoveryToken(c.Request().Context(), req.Token)
-	if err != nil {
-		props := view.ResetPasswordPageProps{
-			Token:        req.Token,
-			GeneralError: "Password reset link is invalid or expired. Please request a new one.",
-		}
-		return c.Render(http.StatusBadRequest, "", view.ResetPasswordForm(props))
-	}
-
-	// Attempt password reset using the temporary access token
-	if err := h.service.ResetPassword(c.Request().Context(), session.AccessToken, req.Password); err != nil {
+	// Attempt password reset (service will validate password then verify token)
+	if err := h.service.ResetPassword(c.Request().Context(), req.Token, req.Password); err != nil {
 		props := view.ResetPasswordPageProps{
 			Token: req.Token,
 		}
 
 		switch err {
-		case ErrInvalidToken:
-			props.GeneralError = "Password reset link is invalid or expired. Please request a new one."
 		case ErrWeakPassword:
 			props.PasswordError = "Password is too weak"
+			return c.Render(http.StatusUnprocessableEntity, "", view.ResetPasswordForm(props))
+		case ErrInvalidToken:
+			props.GeneralError = "Password reset link is invalid or expired. Please request a new one."
+			return c.Render(http.StatusBadRequest, "", view.ResetPasswordForm(props))
 		default:
 			props.GeneralError = "Failed to reset password. Please try again later"
+			return c.Render(http.StatusBadRequest, "", view.ResetPasswordForm(props))
 		}
-
-		return c.Render(http.StatusBadRequest, "", view.ResetPasswordForm(props))
 	}
 
 	// DO NOT set session cookies - user must log in with new password

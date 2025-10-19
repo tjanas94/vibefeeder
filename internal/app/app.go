@@ -54,7 +54,13 @@ func New() (*App, error) {
 	appCtx, cancelAppCtx := context.WithCancel(context.Background())
 
 	// Initialize feed fetcher service
-	feedFetcher := fetcher.NewFeedFetcherService(db, log, cfg.Fetcher, appCtx)
+	fetcherRepo := fetcher.NewRepository(db)
+	httpClient := fetcher.NewHTTPClient(fetcher.HTTPClientConfig{
+		Timeout:         cfg.Fetcher.RequestTimeout,
+		FollowRedirects: false,
+		Logger:          log,
+	})
+	feedFetcher := fetcher.NewFeedFetcherService(fetcherRepo, httpClient, log, cfg.Fetcher, appCtx)
 
 	// Create Echo instance
 	e := echo.New()

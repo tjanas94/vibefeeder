@@ -8,6 +8,7 @@ import (
 
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	"github.com/tjanas94/vibefeeder/internal/shared/events"
 	sharedmodels "github.com/tjanas94/vibefeeder/internal/shared/models"
 )
 
@@ -22,17 +23,29 @@ var (
 	ErrFeedURLConflict = errors.New("feed URL already in use")
 )
 
+// FeedRepository defines the interface for feed data access
+type FeedRepository interface {
+	ListFeeds(ctx context.Context, query models.ListFeedsQuery) (*ListFeedsResult, error)
+	InsertFeed(ctx context.Context, feed database.PublicFeedsInsert) (string, error)
+	FindFeedByIDAndUser(ctx context.Context, feedID, userID string) (*database.PublicFeedsSelect, error)
+	IsURLTaken(ctx context.Context, userID, url, excludeFeedID string) (bool, error)
+	UpdateFeed(ctx context.Context, feedID string, update database.PublicFeedsUpdate) error
+	DeleteFeed(ctx context.Context, id, userID string) error
+}
+
 // Service handles business logic for feeds
 type Service struct {
-	repo   *Repository
-	logger *slog.Logger
+	repo      FeedRepository
+	eventRepo events.EventRepository
+	logger    *slog.Logger
 }
 
 // NewService creates a new feed service
-func NewService(db *database.Client, logger *slog.Logger) *Service {
+func NewService(repo FeedRepository, eventRepo events.EventRepository, logger *slog.Logger) *Service {
 	return &Service{
-		repo:   NewRepository(db),
-		logger: logger,
+		repo:      repo,
+		eventRepo: eventRepo,
+		logger:    logger,
 	}
 }
 
@@ -64,26 +77,19 @@ func (s *Service) CreateFeed(ctx context.Context, cmd models.CreateFeedCommand, 
 		return "", fmt.Errorf("failed to create feed: %w", err)
 	}
 
-	// Log feed_added event (non-critical, ignores errors)
-	s.logFeedAddedEvent(ctx, userID, cmd.Name, cmd.URL)
+	// Log feed_added event
+	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
+		EventType: events.EventFeedAdded,
+		UserId:    &userID,
+		Metadata: map[string]any{
+			"feed_name": cmd.Name,
+			"feed_url":  cmd.URL,
+		},
+	}); err != nil {
+		s.logger.Warn("Failed to log event", "event_type", events.EventFeedAdded, "error", err, "user_id", userID)
+	}
 
 	return feedID, nil
-}
-
-// logFeedAddedEvent logs feed_added event (non-critical operation, ignores errors)
-func (s *Service) logFeedAddedEvent(ctx context.Context, userID, feedName, feedURL string) {
-	event := database.PublicEventsInsert{
-		EventType: "feed_added",
-		UserId:    &userID,
-		Metadata: map[string]interface{}{
-			"feed_name": feedName,
-			"feed_url":  feedURL,
-		},
-	}
-
-	if err := s.repo.InsertEvent(ctx, event); err != nil {
-		s.logger.Warn("failed to log feed_added event", "user_id", userID, "error", err)
-	}
 }
 
 // GetFeedForEdit retrieves a feed for editing

@@ -12,6 +12,9 @@ type Repository struct {
 	db *database.Client
 }
 
+// Ensure Repository implements FetcherRepository interface at compile time
+var _ FetcherRepository = (*Repository)(nil)
+
 // NewRepository creates a new fetcher repository
 func NewRepository(db *database.Client) *Repository {
 	return &Repository{db: db}

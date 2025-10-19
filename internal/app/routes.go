@@ -6,11 +6,13 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/supabase-community/gotrue-go"
 	authModule "github.com/tjanas94/vibefeeder/internal/auth"
 	"github.com/tjanas94/vibefeeder/internal/dashboard"
 	"github.com/tjanas94/vibefeeder/internal/feed"
 	"github.com/tjanas94/vibefeeder/internal/shared/ai"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
+	"github.com/tjanas94/vibefeeder/internal/shared/events"
 	"github.com/tjanas94/vibefeeder/internal/summary"
 	"golang.org/x/time/rate"
 )
@@ -20,13 +22,13 @@ func (a *App) setupRoutes() {
 	// Health check endpoint (public)
 	a.Echo.GET("/healthz", a.healthCheck)
 
+	// Initialize shared repositories
+	eventsRepo := events.NewRepository(a.DB)
+
 	// Initialize auth components
-	authRepo := authModule.NewRepository(a.DB)
-	authService, err := authModule.NewService(a.Config.Supabase.URL, a.Config.Supabase.Key, authRepo, &a.Config.Auth, a.Logger)
-	if err != nil {
-		a.Logger.Error("Failed to initialize auth service", "error", err)
-		panic("Auth service is required but failed to initialize: " + err.Error())
-	}
+	// Create gotrue client with custom URL
+	authClient := gotrue.New("dummy", a.Config.Supabase.Key).WithCustomGoTrueURL(a.Config.Supabase.URL + "/auth/v1")
+	authService := authModule.NewService(authClient, eventsRepo, &a.Config.Auth, a.Logger)
 	sessionManager := authModule.NewSessionManager(&a.Config.Auth)
 	requireRegCode := a.Config.Auth.RegistrationCode != ""
 	authHandler := authModule.NewHandler(authService, sessionManager, a.Logger, requireRegCode)
@@ -64,7 +66,8 @@ func (a *App) setupRoutes() {
 	protectedGroup.GET("/dashboard", dashboardHandler.ShowDashboard)
 
 	// Feed routes
-	feedService := feed.NewService(a.DB, a.Logger)
+	feedRepo := feed.NewRepository(a.DB)
+	feedService := feed.NewService(feedRepo, eventsRepo, a.Logger)
 	feedHandler := feed.NewHandler(feedService, a.Logger, a.FeedFetcher)
 	protectedGroup.GET("/feeds", feedHandler.ListFeeds)
 	protectedGroup.GET("/feeds/new", feedHandler.HandleFeedAddForm)
@@ -85,7 +88,8 @@ func (a *App) setupRoutes() {
 		panic("OpenRouter service is required but failed to initialize: " + err.Error())
 	}
 
-	summaryService := summary.NewService(a.DB, aiService, a.Logger)
+	summaryRepo := summary.NewRepository(a.DB)
+	summaryService := summary.NewService(summaryRepo, aiService, a.Logger, eventsRepo)
 	summaryHandler := summary.NewHandler(summaryService, a.Logger)
 
 	// Configure rate limiter from config

@@ -16,11 +16,24 @@ import (
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
 )
 
+// FetcherRepository defines the interface for fetcher data access
+type FetcherRepository interface {
+	FindFeedsDueForFetch(ctx context.Context, limit int) ([]database.PublicFeedsSelect, error)
+	FindFeedByID(ctx context.Context, feedID string) (*database.PublicFeedsSelect, error)
+	UpdateFeedAfterFetch(ctx context.Context, feedID string, update database.PublicFeedsUpdate) error
+	InsertArticles(ctx context.Context, articles []database.PublicArticlesInsert) error
+}
+
+// HTTPClientInterface defines the interface for HTTP client operations
+type HTTPClientInterface interface {
+	ExecuteRequest(ctx context.Context, params ExecuteRequestParams) (*http.Response, error)
+}
+
 // FeedFetcherService handles automatic feed fetching in the background
 type FeedFetcherService struct {
-	repo       *Repository
+	repo       FetcherRepository
 	logger     *slog.Logger
-	httpClient *HTTPClient
+	httpClient HTTPClientInterface
 	config     config.FetcherConfig
 	appCtx     context.Context // Main application context for graceful shutdown
 
@@ -34,19 +47,14 @@ type FeedFetcherService struct {
 
 // NewFeedFetcherService creates a new feed fetcher service instance
 func NewFeedFetcherService(
-	dbClient *database.Client,
+	repo FetcherRepository,
+	httpClient HTTPClientInterface,
 	logger *slog.Logger,
 	cfg config.FetcherConfig,
 	appCtx context.Context,
 ) *FeedFetcherService {
-	httpClient := NewHTTPClient(HTTPClientConfig{
-		Timeout:         cfg.RequestTimeout,
-		FollowRedirects: false,
-		Logger:          logger,
-	})
-
 	return &FeedFetcherService{
-		repo:              NewRepository(dbClient),
+		repo:              repo,
 		logger:            logger,
 		httpClient:        httpClient,
 		config:            cfg,

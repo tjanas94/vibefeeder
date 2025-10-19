@@ -14,6 +14,9 @@ type Repository struct {
 	db *database.Client
 }
 
+// Ensure Repository implements FeedRepository interface at compile time
+var _ FeedRepository = (*Repository)(nil)
+
 // NewRepository creates a new feed repository
 func NewRepository(db *database.Client) *Repository {
 	return &Repository{db: db}
@@ -82,16 +85,6 @@ func (r *Repository) InsertFeed(ctx context.Context, feed database.PublicFeedsIn
 	}
 
 	return result[0].Id, nil
-}
-
-// InsertEvent creates a new event in the database
-func (r *Repository) InsertEvent(ctx context.Context, event database.PublicEventsInsert) error {
-	var result []database.PublicEventsSelect
-	_, err := r.db.From("events").Insert(event, false, "", "", "").ExecuteTo(&result)
-	if err != nil {
-		return fmt.Errorf("failed to insert event: %w", err)
-	}
-	return nil
 }
 
 // FindFeedByIDAndUser retrieves a single feed by ID and user ID

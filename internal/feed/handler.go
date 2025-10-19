@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
@@ -75,32 +74,12 @@ func (h *Handler) ListFeeds(c echo.Context) error {
 	}
 
 	// Build URL for HX-Push-Url header to update browser history
-	pushURL := "/dashboard"
-	params := make(url.Values)
-
-	if query.Search != "" {
-		params.Set("search", query.Search)
-	}
-	if query.Status != "" && query.Status != "all" {
-		params.Set("status", query.Status)
-	}
-	if query.Page > 1 {
-		params.Set("page", fmt.Sprintf("%d", query.Page))
-	}
-
-	if len(params) > 0 {
-		pushURL += "?" + params.Encode()
-	}
-
+	pushURL := buildDashboardURL(*query)
 	c.Response().Header().Set("HX-Push-Url", pushURL)
 
 	// Set HX-Trigger header to notify about feed availability
 	hasFeeds := !vm.ShowEmptyState
-	if hasFeeds {
-		c.Response().Header().Set("HX-Trigger", `{"feedsLoaded": {"hasFeeds": true}}`)
-	} else {
-		c.Response().Header().Set("HX-Trigger", `{"feedsLoaded": {"hasFeeds": false}}`)
-	}
+	c.Response().Header().Set("HX-Trigger", fmt.Sprintf(`{"feedsLoaded": {"hasFeeds": %t}}`, hasFeeds))
 
 	// Success - render list view with view model
 	return c.Render(http.StatusOK, "", view.List(*vm))

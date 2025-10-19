@@ -25,46 +25,8 @@ func NewHTTPErrorHandler(logger *slog.Logger) echo.HTTPErrorHandler {
 			return
 		}
 
-		// Default to 500 Internal Server Error
-		code := http.StatusInternalServerError
-		title := "Internal Server Error"
-		message := "An unexpected error occurred. Please try again later."
-
-		// Check if it's an Echo HTTPError
-		if he, ok := err.(*echo.HTTPError); ok {
-			code = he.Code
-
-			// Set title based on status code
-			switch code {
-			case http.StatusNotFound:
-				title = "Not Found"
-				message = "The page you're looking for doesn't exist."
-			case http.StatusMethodNotAllowed:
-				title = "Method Not Allowed"
-				message = "The requested method is not allowed for this resource."
-			case http.StatusBadRequest:
-				title = "Bad Request"
-				message = "The request could not be understood or was missing required parameters."
-			case http.StatusUnauthorized:
-				title = "Unauthorized"
-				message = "You need to be authenticated to access this resource."
-			case http.StatusForbidden:
-				title = "Forbidden"
-				message = "You don't have permission to access this resource."
-			case http.StatusTooManyRequests:
-				title = "Too Many Requests"
-				message = "You've made too many requests. Please try again later."
-			case http.StatusServiceUnavailable:
-				title = "Service Unavailable"
-				message = "The service is temporarily unavailable. Please try again later."
-			default:
-				title = "Error"
-				// Try to use custom message if available and it's a string
-				if msg, ok := he.Message.(string); ok && msg != "" {
-					message = msg
-				}
-			}
-		}
+		// Get error response using helper function
+		resp := getErrorResponse(http.StatusInternalServerError, err)
 
 		// Check if this is an HTMX request
 		isHTMX := c.Request().Header.Get("HX-Request") == "true"
@@ -75,19 +37,19 @@ func NewHTTPErrorHandler(logger *slog.Logger) echo.HTTPErrorHandler {
 			// Set HX-Reswap: none to prevent clearing the main target (e.g., modal content)
 			c.Response().Header().Set("HX-Reswap", "none")
 			component = sharedview.ErrorFragment(sharedview.ErrorFragmentProps{
-				Message: message,
+				Message: resp.Message,
 			})
 		} else {
 			// For regular requests, use the full error page
 			component = sharedview.ErrorPage(sharedview.ErrorPageProps{
-				Code:    code,
-				Title:   title,
-				Message: message,
+				Code:    resp.Code,
+				Title:   resp.Title,
+				Message: resp.Message,
 			})
 		}
 
 		// Render the component
-		if err := c.Render(code, "", component); err != nil {
+		if err := c.Render(resp.Code, "", component); err != nil {
 			logger.Error("Failed to render error response", "error", err)
 		}
 	}

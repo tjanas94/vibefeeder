@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/supabase-community/postgrest-go"
 	"github.com/tjanas94/vibefeeder/internal/shared/ai"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	"github.com/tjanas94/vibefeeder/internal/shared/events"
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 )
 
@@ -17,6 +17,14 @@ const (
 	maxArticlesForSummary = 100
 )
 
+// SummaryRepository defines the interface for summary data access
+type SummaryRepository interface {
+	FetchRecentArticles(ctx context.Context, userID string, limit int) ([]models.ArticleForPrompt, error)
+	SaveSummary(ctx context.Context, userID, content string) (*database.PublicSummariesSelect, error)
+	GetLatestSummary(ctx context.Context, userID string) (*database.PublicSummariesSelect, error)
+	HasFeeds(ctx context.Context, userID string) (bool, error)
+}
+
 // AIClient defines the interface for AI service communication
 type AIClient interface {
 	GenerateChatCompletion(ctx context.Context, options ai.GenerateChatCompletionOptions) (*ai.ChatCompletionResponse, error)
@@ -24,24 +32,26 @@ type AIClient interface {
 
 // Service handles business logic for summary generation
 type Service struct {
-	db       *database.Client
-	aiClient AIClient
-	logger   *slog.Logger
+	repo       SummaryRepository
+	aiClient   AIClient
+	logger     *slog.Logger
+	eventsRepo events.EventRepository
 }
 
 // NewService creates a new summary service
-func NewService(db *database.Client, aiClient AIClient, logger *slog.Logger) *Service {
+func NewService(repo SummaryRepository, aiClient AIClient, logger *slog.Logger, eventsRepo events.EventRepository) *Service {
 	return &Service{
-		db:       db,
-		aiClient: aiClient,
-		logger:   logger,
+		repo:       repo,
+		aiClient:   aiClient,
+		logger:     logger,
+		eventsRepo: eventsRepo,
 	}
 }
 
 // GenerateSummary generates a new AI summary from user's articles from the last 24 hours
 func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.SummaryDisplayViewModel, error) {
 	// Step 1: Fetch articles from last 24 hours
-	articles, err := s.fetchRecentArticles(ctx, userID)
+	articles, err := s.repo.FetchRecentArticles(ctx, userID, maxArticlesForSummary)
 	if err != nil {
 		s.logger.Error("failed to fetch articles", "user_id", userID, "error", err)
 		return nil, fmt.Errorf("failed to fetch articles: %w", err)
@@ -73,133 +83,62 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 	}
 
 	// Extract summary content from response
-	if len(response.Choices) == 0 || response.Choices[0].Message.Content == "" {
-		s.logger.Error("AI service returned empty response", "user_id", userID)
+	summaryContent, err := extractSummaryContent(response)
+	if err != nil {
+		s.logger.Error("AI service returned empty response", "user_id", userID, "error", err)
 		return nil, ErrAIServiceUnavailable
 	}
-	summaryContent := response.Choices[0].Message.Content
 
 	// Step 4: Save summary to database
-	dbSummary, err := s.saveSummary(ctx, userID, summaryContent)
+	dbSummary, err := s.repo.SaveSummary(ctx, userID, summaryContent)
 	if err != nil {
 		s.logger.Error("failed to save summary to database", "user_id", userID, "error", err)
 		return nil, ErrDatabase
 	}
 
-	// Step 5: Record event
-	if err := s.recordSummaryEvent(ctx, userID); err != nil {
-		// Log error but don't fail the request
-		s.logger.Warn("failed to record summary event", "user_id", userID, "error", err)
+	// Log summary_generated event
+	if err := s.eventsRepo.RecordEvent(ctx, database.PublicEventsInsert{
+		EventType: events.EventSummaryGenerated,
+		UserId:    &userID,
+		Metadata:  nil,
+	}); err != nil {
+		s.logger.Warn("Failed to log event", "event_type", events.EventSummaryGenerated, "error", err, "user_id", userID)
 	}
 
 	// Convert database type to view model
-	summaryVM := models.NewSummaryFromDB(*dbSummary)
-	return &models.SummaryDisplayViewModel{
-		Summary:     &summaryVM,
-		CanGenerate: true, // User just generated, so they have feeds
-	}, nil
-}
-
-// fetchRecentArticles retrieves articles published in the last 24 hours for the user's feeds
-// Limited to maxArticlesForSummary most recent articles
-func (s *Service) fetchRecentArticles(ctx context.Context, userID string) ([]models.ArticleForPrompt, error) {
-	// Calculate 24 hours ago timestamp
-	twentyFourHoursAgo := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
-
-	var articles []models.ArticleForPrompt
-
-	// Query articles joined with feeds to filter by user_id
-	_, err := s.db.From("articles").
-		Select("title, content, feeds!inner(user_id)", "", false).
-		Eq("feeds.user_id", userID).
-		Gte("published_at", twentyFourHoursAgo).
-		Order("published_at", &postgrest.OrderOpts{Ascending: false}).
-		Limit(maxArticlesForSummary, "").
-		ExecuteTo(&articles)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return articles, nil
-}
-
-// saveSummary stores the generated summary in the database
-func (s *Service) saveSummary(ctx context.Context, userID, content string) (*database.PublicSummariesSelect, error) {
-	insert := models.ToInsert(userID, content)
-
-	var result []database.PublicSummariesSelect
-	_, err := s.db.From("summaries").
-		Insert(insert, false, "", "", "").
-		ExecuteTo(&result)
-
-	if err != nil {
-		s.logger.Error("database insert failed", "user_id", userID, "error", err)
-		return nil, err
-	}
-
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no summary returned after insert")
-	}
-
-	return &result[0], nil
-}
-
-// recordSummaryEvent records a summary_generated event in the events table
-func (s *Service) recordSummaryEvent(ctx context.Context, userID string) error {
-	event := database.PublicEventsInsert{
-		EventType: "summary_generated",
-		UserId:    &userID,
-		Metadata:  map[string]interface{}{},
-	}
-
-	var result []database.PublicEventsSelect
-	_, err := s.db.From("events").
-		Insert(event, false, "", "", "").
-		ExecuteTo(&result)
-
-	return err
+	vm := buildSummaryDisplayViewModel(dbSummary, true)
+	return &vm, nil
 }
 
 // GetLatestSummaryForUser retrieves the latest summary for a user and determines if they can generate new ones
 func (s *Service) GetLatestSummaryForUser(ctx context.Context, userID string) (*models.SummaryDisplayViewModel, error) {
 	// Step 1: Fetch the latest summary for the user
-	var summaries []database.PublicSummariesSelect
-	_, err := s.db.From("summaries").
-		Select("*", "", false).
-		Eq("user_id", userID).
-		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
-		Limit(1, "").
-		ExecuteTo(&summaries)
-
+	summary, err := s.repo.GetLatestSummary(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch latest summary: %w", err)
+		return nil, err
 	}
 
 	// Step 2: Check if user has at least one feed
-	var feeds []database.PublicFeedsSelect
-	_, err = s.db.From("feeds").
-		Select("id", "", false).
-		Eq("user_id", userID).
-		Limit(1, "").
-		ExecuteTo(&feeds)
-
+	canGenerate, err := s.repo.HasFeeds(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user feeds: %w", err)
 	}
 
-	canGenerate := len(feeds) > 0
-
 	// Step 3: Build the view model
-	vm := &models.SummaryDisplayViewModel{
+	vm := buildSummaryDisplayViewModel(summary, canGenerate)
+	return &vm, nil
+}
+
+// buildSummaryDisplayViewModel is a pure function that transforms database result to view model
+func buildSummaryDisplayViewModel(summary *database.PublicSummariesSelect, canGenerate bool) models.SummaryDisplayViewModel {
+	vm := models.SummaryDisplayViewModel{
 		CanGenerate: canGenerate,
 	}
 
-	// If summary exists, convert it to view model
-	if len(summaries) > 0 {
-		summaryVM := models.NewSummaryFromDB(summaries[0])
+	if summary != nil {
+		summaryVM := models.NewSummaryFromDB(*summary)
 		vm.Summary = &summaryVM
 	}
 
-	return vm, nil
+	return vm
 }

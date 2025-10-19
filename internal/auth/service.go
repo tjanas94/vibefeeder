@@ -2,16 +2,15 @@ package auth
 
 import (
 	"context"
-	"crypto/subtle"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/supabase-community/gotrue-go"
 	"github.com/supabase-community/gotrue-go/types"
 	"github.com/tjanas94/vibefeeder/internal/auth/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/config"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	"github.com/tjanas94/vibefeeder/internal/shared/events"
 	passwordvalidator "github.com/wagslane/go-password-validator"
 )
 
@@ -19,42 +18,28 @@ const (
 	// Password entropy requirement (bits)
 	// 50 bits is approximately equivalent to 8 characters with 2 out of 3 character classes
 	minPasswordEntropy = 50
-
-	// Event types for logging
-	eventUserRegistered    = "user_registered"
-	eventUserLogin         = "user_login"
-	eventUserPasswordReset = "user_password_reset"
 )
 
 // Service handles authentication business logic
 type Service struct {
 	authClient gotrue.Client
-	repo       *Repository
+	eventRepo  events.EventRepository
 	config     *config.AuthConfig
 	logger     *slog.Logger
 }
 
 // NewService creates a new auth service
-func NewService(supabaseURL, supabaseKey string, repo *Repository, cfg *config.AuthConfig, logger *slog.Logger) (*Service, error) {
-	// Create gotrue client with custom URL
-	// We use WithCustomGoTrueURL because we expect a full Supabase URL (e.g., http://127.0.0.1:54321 or https://xyz.supabase.co)
-	// and need to append /auth/v1 to it
-	authClient := gotrue.New("dummy", supabaseKey).WithCustomGoTrueURL(supabaseURL + "/auth/v1")
-
-	if authClient == nil {
-		return nil, fmt.Errorf("failed to create gotrue client")
-	}
-
+func NewService(authClient gotrue.Client, eventRepo events.EventRepository, cfg *config.AuthConfig, logger *slog.Logger) *Service {
 	return &Service{
 		authClient: authClient,
-		repo:       repo,
+		eventRepo:  eventRepo,
 		config:     cfg,
 		logger:     logger,
-	}, nil
+	}
 }
 
-// ValidatePassword checks if password meets strength requirements
-func (s *Service) ValidatePassword(password string) error {
+// validatePassword checks if password meets strength requirements
+func (s *Service) validatePassword(password string) error {
 	err := passwordvalidator.Validate(password, minPasswordEntropy)
 	if err != nil {
 		s.logger.Debug("Password validation failed", "error", err)
@@ -66,15 +51,13 @@ func (s *Service) ValidatePassword(password string) error {
 // Register creates a new user account
 func (s *Service) Register(ctx context.Context, req models.RegisterRequest) error {
 	// Validate registration code if configured (constant-time comparison to prevent timing attacks)
-	if s.config.RegistrationCode != "" {
-		if subtle.ConstantTimeCompare([]byte(req.RegistrationCode), []byte(s.config.RegistrationCode)) != 1 {
-			s.logger.Debug("Invalid registration code attempt", "email", req.Email)
-			return ErrInvalidRegistrationCode
-		}
+	if !validateRegistrationCode(req.RegistrationCode, s.config.RegistrationCode) {
+		s.logger.Debug("Invalid registration code attempt", "email", req.Email)
+		return ErrInvalidRegistrationCode
 	}
 
 	// Validate password strength
-	if err := s.ValidatePassword(req.Password); err != nil {
+	if err := s.validatePassword(req.Password); err != nil {
 		return err
 	}
 
@@ -92,7 +75,7 @@ func (s *Service) Register(ctx context.Context, req models.RegisterRequest) erro
 
 	if err != nil {
 		// Check if user already exists
-		if strings.Contains(err.Error(), "already registered") || strings.Contains(err.Error(), "email address already") {
+		if isUserExistsError(err) {
 			return ErrUserAlreadyExists
 		}
 		s.logger.Error("Failed to register user", "error", err, "email", req.Email)
@@ -101,12 +84,12 @@ func (s *Service) Register(ctx context.Context, req models.RegisterRequest) erro
 
 	// Log registration event
 	userID := resp.ID.String()
-	if err := s.repo.InsertEvent(ctx, database.PublicEventsInsert{
+	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
 		UserId:    &userID,
-		EventType: eventUserRegistered,
+		EventType: events.EventUserRegistered,
 		Metadata:  nil,
 	}); err != nil {
-		s.logger.Error("Failed to log registration event", "error", err, "user_id", userID)
+		s.logger.Error("Failed to log event", "event_type", events.EventUserRegistered, "error", err, "user_id", userID)
 	}
 
 	s.logger.Info("User registered successfully", "user_id", userID, "email", req.Email)
@@ -125,12 +108,12 @@ func (s *Service) Login(ctx context.Context, req models.LoginRequest) (*models.U
 
 	// Log login event
 	userID := resp.User.ID.String()
-	if err := s.repo.InsertEvent(ctx, database.PublicEventsInsert{
+	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
 		UserId:    &userID,
-		EventType: eventUserLogin,
+		EventType: events.EventUserLogin,
 		Metadata:  nil,
 	}); err != nil {
-		s.logger.Error("Failed to log login event", "error", err, "user_id", userID)
+		s.logger.Error("Failed to log event", "event_type", events.EventUserLogin, "error", err, "user_id", userID)
 	}
 
 	s.logger.Info("User logged in successfully", "user_id", userID, "email", req.Email)
@@ -212,8 +195,8 @@ func (s *Service) SendPasswordResetEmail(ctx context.Context, email string) erro
 	return nil
 }
 
-// VerifyRecoveryToken verifies a password recovery token and returns a session
-func (s *Service) VerifyRecoveryToken(ctx context.Context, tokenHash string) (*models.UserSession, error) {
+// verifyRecoveryToken verifies a password recovery token and returns a session
+func (s *Service) verifyRecoveryToken(ctx context.Context, tokenHash string) (*models.UserSession, error) {
 	// Build redirect URL
 	redirectURL := fmt.Sprintf("%s/auth/reset-password", s.config.RedirectURL)
 
@@ -254,15 +237,21 @@ func (s *Service) VerifyRecoveryToken(ctx context.Context, tokenHash string) (*m
 	}, nil
 }
 
-// ResetPassword resets the user's password using an authenticated session
-func (s *Service) ResetPassword(ctx context.Context, accessToken, newPassword string) error {
-	// Validate password strength
-	if err := s.ValidatePassword(newPassword); err != nil {
+// ResetPassword resets the user's password using a recovery token
+func (s *Service) ResetPassword(ctx context.Context, tokenHash, newPassword string) error {
+	// Validate password strength first (fail fast before expensive token verification)
+	if err := s.validatePassword(newPassword); err != nil {
+		return err
+	}
+
+	// Verify recovery token and get temporary access token
+	session, err := s.verifyRecoveryToken(ctx, tokenHash)
+	if err != nil {
 		return err
 	}
 
 	// Create a client with the access token from the recovery session
-	client := s.authClient.WithToken(accessToken)
+	client := s.authClient.WithToken(session.AccessToken)
 
 	// Update password with Supabase
 	resp, err := client.UpdateUser(types.UpdateUserRequest{
@@ -276,12 +265,12 @@ func (s *Service) ResetPassword(ctx context.Context, accessToken, newPassword st
 
 	// Log password reset event
 	userID := resp.ID.String()
-	if err := s.repo.InsertEvent(ctx, database.PublicEventsInsert{
+	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
 		UserId:    &userID,
-		EventType: eventUserPasswordReset,
+		EventType: events.EventUserPasswordReset,
 		Metadata:  nil,
 	}); err != nil {
-		s.logger.Error("Failed to log password reset event", "error", err, "user_id", userID)
+		s.logger.Error("Failed to log event", "event_type", events.EventUserPasswordReset, "error", err, "user_id", userID)
 	}
 
 	s.logger.Info("Password reset successfully", "user_id", userID)

@@ -36,6 +36,9 @@ type HTTPClient struct {
 	logger *slog.Logger
 }
 
+// Ensure HTTPClient implements HTTPClientInterface at compile time
+var _ HTTPClientInterface = (*HTTPClient)(nil)
+
 // NewHTTPClient creates a new HTTP client with SSRF protection via custom Dialer.
 // The SSRF validation happens at the connection level, preventing TOCTOU vulnerabilities.
 func NewHTTPClient(cfg HTTPClientConfig) *HTTPClient {
