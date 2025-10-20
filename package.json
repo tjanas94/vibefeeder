@@ -17,18 +17,19 @@
   },
   "dependencies": {
     "alpinejs": "3.15.0",
-    "daisyui": "5.1.29",
+    "daisyui": "5.3.7",
     "htmx.org": "2.0.7"
   },
   "devDependencies": {
     "@commitlint/cli": "20.1.0",
     "@commitlint/config-conventional": "20.0.0",
-    "@tailwindcss/cli": "4.1.14",
+    "@playwright/test": "1.56.1",
+    "@tailwindcss/cli": "4.1.15",
     "husky": "9.1.7",
-    "lint-staged": "16.2.3",
+    "lint-staged": "16.2.5",
     "prettier": "3.6.2",
-    "supabase": "2.48.3",
-    "tailwindcss": "4.1.14"
+    "supabase": "2.51.0",
+    "tailwindcss": "4.1.15"
   },
   "lint-staged": {
     "*.go": "goimports -w",

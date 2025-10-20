@@ -21,3 +21,12 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Testing
+coverage.out
+coverage.html
+playwright-report/
+test-results/
+screenshots/
+*.test
+*.test.exe

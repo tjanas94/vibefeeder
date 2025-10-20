@@ -148,3 +148,39 @@ tasks:
   fmt:prettier:
     desc: Format with Prettier
     cmd: node_modules/.bin/prettier --write .
+
+  test:
+    desc: Run all tests
+    deps:
+      - test:unit
+      - test:e2e
+
+  test:unit:
+    desc: Run Go unit tests
+    cmd: go test -v -race -coverprofile=coverage.out ./...
+
+  test:unit:coverage:
+    desc: Run unit tests and show coverage report
+    deps:
+      - test:unit
+    cmd: go tool cover -html=coverage.out
+
+  test:e2e:
+    desc: Run Playwright E2E tests
+    cmd: node_modules/.bin/playwright test
+
+  test:e2e:headed:
+    desc: Run Playwright E2E tests in headed mode
+    cmd: node_modules/.bin/playwright test --headed
+
+  test:e2e:ui:
+    desc: Run Playwright E2E tests in UI mode
+    cmd: node_modules/.bin/playwright test --ui
+
+  test:e2e:debug:
+    desc: Debug Playwright E2E tests
+    cmd: node_modules/.bin/playwright test --debug
+
+  test:e2e:report:
+    desc: Show Playwright test report
+    cmd: node_modules/.bin/playwright show-report

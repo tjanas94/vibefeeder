@@ -32,6 +32,9 @@ The project is built with a modern tech stack focused on performance and develop
   - **Task Runner:** [Go-Task](https://taskfile.dev/) for automating development and build tasks.
   - **CI/CD:** [GitHub Actions](https://github.com/features/actions).
   - **Hosting:** [Hetzner Cloud](https://www.hetzner.com/cloud) via Docker.
+- **Testing:**
+  - **Unit Tests:** Go's standard `testing` package with [testify](https://github.com/stretchr/testify) for assertions and mocks.
+  - **E2E Tests:** [Playwright](https://playwright.dev/) for browser automation and testing htmx interactions.
 
 ## Getting Started Locally
 

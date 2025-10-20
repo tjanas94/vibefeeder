@@ -7,7 +7,7 @@ Frontend - htmx + Alpine.js dla komponentów interaktywnych:
 
 Backend - Golang + Templ do generowania HTML po stronie serwera:
 
-- Echo do obsługi routing’u i middleware
+- Echo do obsługi routing'u i middleware
 - Templ jako lekki silnik szablonów do generowania HTML
 - Statycznie typowany język, co pomaga w unikaniu błędów w run-time
 - Zapewnia wysoką wydajność i niskie zużycie zasobów
@@ -28,5 +28,18 @@ AI - Komunikacja z modelami przez usługę Openrouter.ai:
 
 CI/CD i Hosting:
 
-- Github Actions do tworzenia pipeline’ów CI/CD
+- Github Actions do tworzenia pipeline'ów CI/CD
 - Hetzner Cloud do hostowania aplikacji za pośrednictwem obrazu docker
+
+Testowanie:
+
+Testy jednostkowe:
+
+- Standardowa biblioteka `testing` w Go jako podstawa wszystkich testów
+- Testify (stretchr/testify) do asercji i tworzenia mocków
+
+Testy E2E (End-to-End):
+
+- Playwright jako framework do automatyzacji przeglądarki i testowania interakcji htmx
+- Doskonałe wsparcie dla dynamicznych treści i oczekiwania na żądania sieciowe
+- Testy uruchamiane na najnowszych wersjach Chrome i Firefox
