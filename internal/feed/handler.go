@@ -1,6 +1,7 @@
 package feed
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
 	"github.com/tjanas94/vibefeeder/internal/feed/view"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
+	"github.com/tjanas94/vibefeeder/internal/shared/database"
 	sharedmodels "github.com/tjanas94/vibefeeder/internal/shared/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/validator"
 	sharedview "github.com/tjanas94/vibefeeder/internal/shared/view/components"
@@ -35,11 +37,20 @@ func NewHandler(service *Service, logger *slog.Logger, feedFetcher FeedFetcher) 
 	}
 }
 
+// contextWithToken adds the access token from Echo context to request context for RLS
+func (h *Handler) contextWithToken(c echo.Context) context.Context {
+	token := auth.GetAccessToken(c)
+	return database.ContextWithToken(c.Request().Context(), token)
+}
+
 // ListFeeds handles GET /feeds endpoint
 // Returns a list of feeds for the authenticated user with filtering and pagination
 func (h *Handler) ListFeeds(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
+
+	// Add access token to context for RLS
+	ctx := h.contextWithToken(c)
 
 	// Bind and validate query parameters
 	query := new(models.ListFeedsQuery)
@@ -61,7 +72,7 @@ func (h *Handler) ListFeeds(c echo.Context) error {
 	query.UserID = userID
 
 	// Call service to get feeds
-	vm, err := h.service.ListFeeds(c.Request().Context(), *query)
+	vm, err := h.service.ListFeeds(ctx, *query)
 	if err != nil {
 		h.logger.Error("failed to list feeds", "user_id", userID, "error", err)
 		// Return empty state with error message instead of HTTP error
@@ -102,6 +113,9 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
+	// Add access token to context for RLS
+	ctx := h.contextWithToken(c)
+
 	// Bind form data to command
 	cmd := new(models.CreateFeedCommand)
 	if err := c.Bind(cmd); err != nil {
@@ -124,7 +138,7 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 	}
 
 	// Call service to create feed
-	feedID, err := h.service.CreateFeed(c.Request().Context(), *cmd, userID)
+	feedID, err := h.service.CreateFeed(ctx, *cmd, userID)
 	if err != nil {
 		// Handle specific error types
 		if err == ErrFeedAlreadyExists {
@@ -166,6 +180,9 @@ func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 	// Get user ID from authenticated session (check auth first)
 	userID := auth.GetUserID(c)
 
+	// Add access token to context for RLS
+	ctx := h.contextWithToken(c)
+
 	// Get and validate feed ID from path parameter
 	feedID, err := h.getFeedID(c)
 	if err != nil {
@@ -173,7 +190,7 @@ func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 	}
 
 	// Call service to get feed for editing
-	vm, err := h.service.GetFeedForEdit(c.Request().Context(), feedID, userID)
+	vm, err := h.service.GetFeedForEdit(ctx, feedID, userID)
 	if err != nil {
 		// Handle specific error types
 		if err == ErrFeedNotFound {
@@ -196,6 +213,9 @@ func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 func (h *Handler) HandleUpdate(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
+
+	// Add access token to context for RLS
+	ctx := h.contextWithToken(c)
 
 	// Get and validate feed ID from path parameter
 	feedID, err := h.getFeedID(c)
@@ -229,7 +249,7 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 	}
 
 	// Call service to update feed
-	urlChanged, err := h.service.UpdateFeed(c.Request().Context(), feedID, userID, *cmd)
+	urlChanged, err := h.service.UpdateFeed(ctx, feedID, userID, *cmd)
 	if err != nil {
 		// Handle specific error types
 		if err == ErrFeedNotFound {
@@ -280,6 +300,9 @@ func (h *Handler) HandleDeleteConfirmation(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
+	// Add access token to context for RLS
+	ctx := h.contextWithToken(c)
+
 	// Get and validate feed ID from path parameter
 	feedID, err := h.getFeedID(c)
 	if err != nil {
@@ -287,7 +310,7 @@ func (h *Handler) HandleDeleteConfirmation(c echo.Context) error {
 	}
 
 	// Get feed name for confirmation (we need to check if feed exists and belongs to user)
-	feed, err := h.service.GetFeedForEdit(c.Request().Context(), feedID, userID)
+	feed, err := h.service.GetFeedForEdit(ctx, feedID, userID)
 	if err != nil {
 		// Handle specific error types
 		if err == ErrFeedNotFound {
@@ -317,11 +340,14 @@ func (h *Handler) DeleteFeed(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
+	// Add access token to context for RLS
+	ctx := h.contextWithToken(c)
+
 	// Get and validate feed ID from path parameter
 	feedID, err := h.getFeedID(c)
 	if err != nil {
 		// Get feed name for error display
-		feed, feedErr := h.service.GetFeedForEdit(c.Request().Context(), feedID, userID)
+		feed, feedErr := h.service.GetFeedForEdit(ctx, feedID, userID)
 		if feedErr != nil {
 			// If can't get feed, just use generic message
 			vm := models.DeleteConfirmationViewModel{
@@ -340,9 +366,9 @@ func (h *Handler) DeleteFeed(c echo.Context) error {
 	}
 
 	// Call service to delete feed
-	if err := h.service.DeleteFeed(c.Request().Context(), feedID, userID); err != nil {
+	if err := h.service.DeleteFeed(ctx, feedID, userID); err != nil {
 		// Get feed name for error display
-		feed, feedErr := h.service.GetFeedForEdit(c.Request().Context(), feedID, userID)
+		feed, feedErr := h.service.GetFeedForEdit(ctx, feedID, userID)
 		if feedErr != nil {
 			// If can't get feed, use generic message
 			vm := models.DeleteConfirmationViewModel{

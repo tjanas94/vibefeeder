@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	userIDKey    = "user_id"
-	userEmailKey = "user_email"
+	userIDKey      = "user_id"
+	userEmailKey   = "user_email"
+	accessTokenKey = "access_token"
 )
 
 // AuthService defines the interface for authentication operations needed by middleware
@@ -55,9 +56,10 @@ func AuthMiddleware(service AuthService, sessionMgr SessionManager, logger *slog
 				// Update access token cookie with refreshed token
 				sessionMgr.UpdateAccessToken(c, newAccessToken)
 
-				// Set user data in context
+				// Set user data and access token in context
 				c.Set(userIDKey, userID)
 				c.Set(userEmailKey, email)
+				c.Set(accessTokenKey, newAccessToken)
 
 				logger.Debug("Session refreshed successfully", "user_id", userID)
 				return next(c)
@@ -87,17 +89,19 @@ func AuthMiddleware(service AuthService, sessionMgr SessionManager, logger *slog
 				// Update access token cookie
 				sessionMgr.UpdateAccessToken(c, newAccessToken)
 
-				// Set user data in context
+				// Set user data and access token in context
 				c.Set(userIDKey, userID)
 				c.Set(userEmailKey, email)
+				c.Set(accessTokenKey, newAccessToken)
 
 				logger.Debug("Session refreshed after access token validation failed", "user_id", userID)
 				return next(c)
 			}
 
-			// Valid access token, set user data in context
+			// Valid access token, set user data and access token in context
 			c.Set(userIDKey, userID)
 			c.Set(userEmailKey, email)
+			c.Set(accessTokenKey, accessToken)
 
 			return next(c)
 		}
@@ -116,6 +120,14 @@ func GetUserID(c echo.Context) string {
 func GetUserEmail(c echo.Context) string {
 	if email, ok := c.Get(userEmailKey).(string); ok {
 		return email
+	}
+	return ""
+}
+
+// GetAccessToken retrieves the access token from the context
+func GetAccessToken(c echo.Context) string {
+	if token, ok := c.Get(accessTokenKey).(string); ok {
+		return token
 	}
 	return ""
 }

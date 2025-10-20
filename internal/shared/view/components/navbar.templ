@@ -22,7 +22,10 @@ import (
 templ Navbar(props NavbarProps) {
 	<nav class="navbar bg-base-200 shadow-lg flex-wrap justify-between" aria-label="Main navigation">
 		<div class="flex">
-			<a href="/dashboard" class="btn btn-ghost text-xl font-bold" aria-label="VibeFeeder - home page">VibeFeeder</a>
+			<a href="/dashboard" class="btn btn-ghost text-xl font-bold flex items-center gap-2" aria-label="VibeFeeder - home page">
+				<img src="/icon.svg" alt="" class="w-8 h-8" aria-hidden="true"/>
+				<span>VibeFeeder</span>
+			</a>
 		</div>
 		<div class="flex gap-0 sm:gap-2 flex-wrap items-center">
 			{ children... }

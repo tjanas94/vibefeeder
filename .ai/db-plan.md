@@ -230,13 +230,8 @@ WITH CHECK (auth.uid() = user_id);
 -- Enable RLS
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 
--- No SELECT policy for regular users - events are for internal analytics only
+-- No policy for regular users - events are for internal analytics only
 -- System/background jobs use service role to bypass RLS for event insertion
-
--- Allow authenticated users to insert events associated with themselves
-CREATE POLICY "Users can insert their own events"
-ON events FOR INSERT
-WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
 ```
 
 ---

@@ -1,12 +1,14 @@
 package summary
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
+	"github.com/tjanas94/vibefeeder/internal/shared/database"
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 	"github.com/tjanas94/vibefeeder/internal/summary/view"
 )
@@ -25,14 +27,23 @@ func NewHandler(service *Service, logger *slog.Logger) *Handler {
 	}
 }
 
+// contextWithToken adds the access token from Echo context to request context for RLS
+func (h *Handler) contextWithToken(c echo.Context) context.Context {
+	token := auth.GetAccessToken(c)
+	return database.ContextWithToken(c.Request().Context(), token)
+}
+
 // GenerateSummary handles POST /summaries endpoint
 // Generates a new AI summary from user's recent articles
 func (h *Handler) GenerateSummary(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
+	// Add access token to context for RLS
+	ctx := h.contextWithToken(c)
+
 	// Call service to generate summary and get view model
-	vm, err := h.service.GenerateSummary(c.Request().Context(), userID)
+	vm, err := h.service.GenerateSummary(ctx, userID)
 
 	// Domain / expected errors are embedded into the Display view via ErrorMessage
 	if err != nil {
@@ -79,8 +90,11 @@ func (h *Handler) GetLatestSummary(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
+	// Add access token to context for RLS
+	ctx := h.contextWithToken(c)
+
 	// Call service to get latest summary and view model
-	vm, err := h.service.GetLatestSummaryForUser(c.Request().Context(), userID)
+	vm, err := h.service.GetLatestSummaryForUser(ctx, userID)
 	if err != nil {
 		h.logger.Error("failed to get latest summary", "user_id", userID, "error", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to load summary")

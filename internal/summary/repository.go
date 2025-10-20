@@ -26,13 +26,19 @@ func NewRepository(db *database.Client) *Repository {
 // FetchRecentArticles retrieves articles published in the last 24 hours for the user's feeds
 // Limited to maxArticlesForSummary most recent articles
 func (r *Repository) FetchRecentArticles(ctx context.Context, userID string, limit int) ([]models.ArticleForPrompt, error) {
+	// Get authenticated client for RLS
+	client, err := r.db.NewAuthenticatedClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Calculate 24 hours ago timestamp
 	twentyFourHoursAgo := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
 
 	var articles []models.ArticleForPrompt
 
 	// Query articles joined with feeds to filter by user_id
-	_, err := r.db.From("articles").
+	_, err = client.From("articles").
 		Select("title, content, feeds!inner(user_id)", "", false).
 		Eq("feeds.user_id", userID).
 		Gte("published_at", twentyFourHoursAgo).
@@ -49,10 +55,16 @@ func (r *Repository) FetchRecentArticles(ctx context.Context, userID string, lim
 
 // SaveSummary stores the generated summary in the database
 func (r *Repository) SaveSummary(ctx context.Context, userID, content string) (*database.PublicSummariesSelect, error) {
+	// Get authenticated client for RLS
+	client, err := r.db.NewAuthenticatedClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	insert := models.ToInsert(userID, content)
 
 	var result []database.PublicSummariesSelect
-	_, err := r.db.From("summaries").
+	_, err = client.From("summaries").
 		Insert(insert, false, "", "", "").
 		ExecuteTo(&result)
 
@@ -69,8 +81,14 @@ func (r *Repository) SaveSummary(ctx context.Context, userID, content string) (*
 
 // GetLatestSummary retrieves the most recent summary for a user
 func (r *Repository) GetLatestSummary(ctx context.Context, userID string) (*database.PublicSummariesSelect, error) {
+	// Get authenticated client for RLS
+	client, err := r.db.NewAuthenticatedClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var summaries []database.PublicSummariesSelect
-	_, err := r.db.From("summaries").
+	_, err = client.From("summaries").
 		Select("*", "", false).
 		Eq("user_id", userID).
 		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
@@ -90,8 +108,14 @@ func (r *Repository) GetLatestSummary(ctx context.Context, userID string) (*data
 
 // HasFeeds checks if a user has at least one feed
 func (r *Repository) HasFeeds(ctx context.Context, userID string) (bool, error) {
+	// Get authenticated client for RLS
+	client, err := r.db.NewAuthenticatedClient(ctx)
+	if err != nil {
+		return false, err
+	}
+
 	var feeds []database.PublicFeedsSelect
-	_, err := r.db.From("feeds").
+	_, err = client.From("feeds").
 		Select("id", "", false).
 		Eq("user_id", userID).
 		Limit(1, "").

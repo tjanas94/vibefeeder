@@ -208,7 +208,7 @@ templ FeedCard(feed models.FeedItemViewModel) {
 		<div class="card-body p-4">
 			<!-- Header: Name and Status -->
 			<div class="flex items-start justify-between gap-2 mb-2">
-				<h3 class="card-title text-base">{ feed.Name }</h3>
+				<h2 class="card-title text-base">{ feed.Name }</h2>
 				<div class="flex-shrink-0">
 					if feed.HasError {
 						@components.Badge(components.BadgeProps{
