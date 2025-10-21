@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Test Feed - Atom Format</title>
+  <link href="https://example.com/atom-feed"/>
+  <id>urn:uuid:60a76c80-d399-11d9-b91C-0003939e0af6</id>
+  <subtitle>An Atom feed for testing purposes</subtitle>
+  <entry>
+    <title>Atom Entry One - First Post</title>
+    <link href="https://example.com/atom/entry/1"/>
+    <id>urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a</id>
+    <content type="html">This is the content of the first Atom entry. Atom feeds use a different structure than RSS but contain the same information types.</content>
+  </entry>
+  <entry>
+    <title>Atom Entry Two - Second Post</title>
+    <link href="https://example.com/atom/entry/2"/>
+    <id>urn:uuid:1225c695-cfb8-4ebb-bbbb-80da344efa6b</id>
+    <content type="html">This is the content of the second Atom entry. The fetcher should handle both RSS and Atom formats correctly.</content>
+  </entry>
+</feed>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Feed - Edge Cases</title>
+    <link>https://example.com/edge-cases</link>
+    <description>RSS feed with edge cases for robust testing</description>
+    <item>
+      <title>Article With Only Title and Link</title>
+      <link>https://example.com/edge-case/minimal</link>
+    </item>
+    <item>
+      <title>Article With Special Characters &amp; Entities</title>
+      <link>https://example.com/edge-case/special-chars</link>
+      <description>This article contains special characters: &lt;tags&gt;, &quot;quotes&quot;, &apos;apostrophes&apos;, &amp; ampersands. It also has Unicode: ™ © ® ñ é</description>
+    </item>
+    <item>
+      <title>Article With CDATA Content</title>
+      <link>https://example.com/edge-case/cdata</link>
+      <description><![CDATA[
+        <p>This content is wrapped in CDATA, which allows <strong>HTML tags</strong> and special characters like < > & without escaping.</p>
+        <ul>
+          <li>First item</li>
+          <li>Second item</li>
+        </ul>
+      ]]></description>
+    </item>
+    <item>
+      <title>This is a very long article title that tests how the fetcher handles titles that exceed typical lengths and may need to be truncated or handled gracefully by the system</title>
+      <link>https://example.com/edge-case/long-title</link>
+      <description>This article tests behavior with unusually long titles. The fetcher should handle any reasonable title length without issues.</description>
+    </item>
+  </channel>
+</rss>

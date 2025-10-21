@@ -15,10 +15,10 @@ export class DashboardPage extends BasePage {
   constructor(page: Page) {
     super(page);
 
-    // Initialize locators
-    this.pageTitle = page.locator("h1");
-    this.addFeedButton = page.locator('button:has-text("Add Feed"), a:has-text("Add Feed")');
-    this.feedList = page.locator('[data-testid="feed-list"], .feed-list');
+    // Initialize locators using data-testid for resilient selectors
+    this.pageTitle = page.getByTestId("dashboard-title");
+    this.addFeedButton = page.getByTestId("add-feed-button");
+    this.feedList = page.getByTestId("feed-list");
     this.logoutButton = page.locator('button:has-text("Logout"), a:has-text("Logout")');
   }
 

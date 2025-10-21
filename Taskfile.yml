@@ -58,6 +58,14 @@ tasks:
       - build
     cmd: ./dist/vibefeeder
 
+  run:test:
+    desc: Run the built binary with test configuration
+    deps:
+      - build
+    cmd: ./dist/vibefeeder
+    env:
+      VIBEFEEDER_TEST: "true"
+
   clean:
     desc: Clean build artifacts
     cmds:

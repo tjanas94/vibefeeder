@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Feed - Basic</title>
+    <link>https://example.com/feed</link>
+    <description>A basic RSS feed for testing purposes</description>
+    <language>en-us</language>
+    <item>
+      <title>First Article About Testing</title>
+      <link>https://example.com/article/1</link>
+      <description>This is the description of the first test article. It contains some basic information about testing RSS feeds.</description>
+    </item>
+    <item>
+      <title>Second Article With More Content</title>
+      <link>https://example.com/article/2</link>
+      <description>The second article demonstrates how multiple items work in a feed. This description provides additional context for the article.</description>
+    </item>
+    <item>
+      <title>Third Article for Comprehensive Testing</title>
+      <link>https://example.com/article/3</link>
+      <description>A third item shows that feeds can contain multiple articles. Each article has its own metadata that the fetcher should parse correctly.</description>
+    </item>
+  </channel>
+</rss>

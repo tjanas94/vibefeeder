@@ -33,10 +33,11 @@ templ Index(vm models.DashboardViewModel) {
 			<main id="main-content" class="container mx-auto px-4 py-8 max-w-7xl">
 				<!-- Header with Add Feed button -->
 				<div class="flex items-center justify-between mb-6">
-					<h1 tabindex="-1" class="text-2xl font-bold">Dashboard</h1>
+					<h1 tabindex="-1" class="text-2xl font-bold" data-testid="dashboard-title">Dashboard</h1>
 					<button
 						type="button"
 						class="btn btn-primary inline-flex items-center gap-2"
+						data-testid="add-feed-button"
 						@click="lastFocusedElement = $event.target"
 						hx-get="/feeds/new"
 						hx-target="#feed-form-modal-content"
@@ -60,6 +61,7 @@ templ Index(vm models.DashboardViewModel) {
 					<div
 						id="feed-list"
 						class="min-h-[200px]"
+						data-testid="feed-list"
 						hx-get="/feeds"
 						hx-trigger="load"
 						hx-include="#feed-filter-form"

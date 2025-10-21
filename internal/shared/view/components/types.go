@@ -83,6 +83,9 @@ type AlertProps struct {
 
 	// Dismissable determines whether to show the close button (default: false)
 	Dismissable bool
+
+	// TestID is the data-testid attribute for E2E testing (optional)
+	TestID string
 }
 
 // NavbarProps defines configuration for the Navbar component.
@@ -156,6 +159,9 @@ type FormFieldProps struct {
 
 	// Required indicates if the field is required (shows * in label and adds required attribute)
 	Required bool
+
+	// TestID is the data-testid attribute for E2E testing (optional)
+	TestID string
 }
 
 // StatusFilterButtonProps defines configuration for a single status filter radio button.

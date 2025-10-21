@@ -71,14 +71,18 @@ test.describe("Authentication", () => {
     }
   });
 
-  // This test requires valid test credentials or a test user setup
-  test.skip("should successfully login with valid credentials", async ({
-    authPage,
-    dashboardPage,
-  }) => {
-    // TODO: Set up test user credentials via API or environment variables
-    const testEmail = process.env.TEST_USER_EMAIL || "test@example.com";
-    const testPassword = process.env.TEST_USER_PASSWORD || "TestPassword123!";
+  // This test uses credentials configured in .env.test file
+  test("should successfully login with valid credentials", async ({ authPage, dashboardPage }) => {
+    // Get E2E test user credentials from environment
+    const testEmail = process.env.E2E_USERNAME;
+    const testPassword = process.env.E2E_PASSWORD;
+
+    // Validate credentials are configured
+    if (!testEmail || !testPassword) {
+      throw new Error(
+        "E2E test credentials not configured. Please set E2E_USERNAME and E2E_PASSWORD in .env.test file",
+      );
+    }
 
     // Perform login
     await authPage.login(testEmail, testPassword);

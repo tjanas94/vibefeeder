@@ -20,6 +20,9 @@ templ FormField(props FormFieldProps) {
 			name={ props.Name }
 			value={ props.Value }
 			placeholder={ props.Placeholder }
+			if props.TestID != "" {
+				data-testid={ props.TestID }
+			}
 			class={ "input input-bordered w-full", templ.KV("input-error", props.Error != "") }
 			if props.Required {
 				required

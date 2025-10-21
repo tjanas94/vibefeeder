@@ -17,12 +17,12 @@ export class AuthPage extends BasePage {
   constructor(page: Page) {
     super(page);
 
-    // Initialize locators
-    this.emailInput = page.locator('input[name="email"]');
-    this.passwordInput = page.locator('input[name="password"]');
-    this.loginButton = page.locator('button[type="submit"]');
-    this.registerLink = page.locator('a[href*="register"]');
-    this.errorMessage = page.locator(".alert-error");
+    // Initialize locators using data-testid for resilient selectors
+    this.emailInput = page.getByTestId("email-input");
+    this.passwordInput = page.getByTestId("password-input");
+    this.loginButton = page.getByTestId("submit-button");
+    this.registerLink = page.getByTestId("link-register");
+    this.errorMessage = page.getByTestId("login-error");
     this.successMessage = page.locator(".alert-success");
   }
 

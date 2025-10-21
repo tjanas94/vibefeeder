@@ -1,5 +1,12 @@
 {
   "permissions": {
-    "deny": ["Read(./.env)", "Write(./.env)", "Edit(./.env)"]
+    "deny": [
+      "Read(./.env)",
+      "Write(./.env)",
+      "Edit(./.env)",
+      "Read(./.env.test)",
+      "Write(./.env.test)",
+      "Edit(./.env.test)"
+    ]
   }
 }

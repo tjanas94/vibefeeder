@@ -1,6 +1,11 @@
 package view
 
-import "github.com/tjanas94/vibefeeder/internal/shared/view/components"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/tjanas94/vibefeeder/internal/shared/view/components"
+)
 
 // EmailField renders an email input field for authentication forms
 templ EmailField(email string, emailError string) {
@@ -13,6 +18,7 @@ templ EmailField(email string, emailError string) {
 		Placeholder: "your@email.com",
 		Error:       emailError,
 		Required:    true,
+		TestID:      "email-input",
 	})
 }
 
@@ -27,6 +33,7 @@ templ PasswordField(passwordError string) {
 		Placeholder: "",
 		Error:       passwordError,
 		Required:    true,
+		TestID:      "password-input",
 	})
 }
 
@@ -41,6 +48,7 @@ templ PasswordConfirmField(passwordConfirmError string) {
 		Placeholder: "",
 		Error:       passwordConfirmError,
 		Required:    true,
+		TestID:      "password-confirm-input",
 	})
 }
 
@@ -55,6 +63,7 @@ templ RegistrationCodeField(code string, codeError string) {
 		Placeholder: "Enter registration code",
 		Error:       codeError,
 		Required:    true,
+		TestID:      "registration-code-input",
 	})
 }
 
@@ -79,6 +88,7 @@ templ AuthLink(href string, text string) {
 	<a
 		href={ templ.SafeURL(href) }
 		class="link link-primary text-sm"
+		data-testid={ fmt.Sprintf("link-%s", strings.TrimPrefix(href, "/auth/")) }
 	>
 		{ text }
 	</a>
@@ -89,6 +99,7 @@ templ SubmitButton(text string) {
 	<button
 		type="submit"
 		class="btn btn-primary w-full"
+		data-testid="submit-button"
 		aria-label={ text }
 	>
 		@components.ButtonLoader(components.ButtonLoaderProps{})

@@ -1,4 +1,8 @@
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+
+import dotenv from "dotenv";
+dotenv.config({ path: path.resolve(process.cwd(), ".env.test") });
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -33,9 +37,12 @@ export default defineConfig({
     },
   ],
 
+  /* Global teardown to clean up test data after all tests */
+  globalTeardown: "./tests/e2e/global.teardown.ts",
+
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "task run",
+    command: "task run:test",
     url: "http://localhost:8080",
     reuseExistingServer: !process.env.CI,
     stdout: "ignore",

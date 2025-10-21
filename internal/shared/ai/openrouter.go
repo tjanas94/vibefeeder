@@ -15,10 +15,15 @@ const (
 	openRouterBaseURL = "https://openrouter.ai/api/v1"
 )
 
+// HTTPClient defines the interface for making HTTP requests
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // OpenRouterService handles communication with OpenRouter API
 type OpenRouterService struct {
 	apiKey     string
-	httpClient *http.Client
+	httpClient HTTPClient
 	baseURL    string
 }
 
@@ -93,7 +98,7 @@ type errorResponse struct {
 
 // NewOpenRouterService creates a new instance of OpenRouter service.
 // Requires OpenRouter configuration and HTTP client.
-func NewOpenRouterService(cfg config.OpenRouterConfig, httpClient *http.Client) (*OpenRouterService, error) {
+func NewOpenRouterService(cfg config.OpenRouterConfig, httpClient HTTPClient) (*OpenRouterService, error) {
 	if httpClient == nil {
 		return nil, fmt.Errorf("HTTP client is required")
 	}

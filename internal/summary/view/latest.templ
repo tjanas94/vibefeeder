@@ -1,8 +1,6 @@
 package view
 
 import (
-	"fmt"
-	"html"
 	"time"
 
 	"github.com/tjanas94/vibefeeder/internal/shared/csrf"
@@ -87,7 +85,7 @@ templ Content(props ContentProps) {
 			</time>
 		</p>
 		<div class="whitespace-pre-line leading-relaxed text-base">
-			{ sanitizeSummaryContent(props.Summary.Content) }
+			{ props.Summary.Content }
 		</div>
 	</article>
 	<div class="flex items-center justify-between mt-6 gap-4 flex-wrap">
@@ -151,29 +149,5 @@ templ Error(vm models.SummaryErrorViewModel) {
 			AriaLabel:  "Try generating the AI summary again",
 			ButtonSize: "",
 		})
-	}
-}
-
-// sanitizeSummaryContent escapes any unsafe HTML to prevent injection.
-// The content returned by AI should be treated as untrusted unless sanitized upstream.
-func sanitizeSummaryContent(content string) string {
-	return html.EscapeString(content)
-}
-
-// (Optional) Utility to produce relative time strings if needed in future enhancements.
-func humanizeTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%d min ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%d hrs ago", int(d.Hours()))
-	default:
-		return t.Format("Jan 2, 2006 15:04")
 	}
 }

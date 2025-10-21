@@ -44,6 +44,7 @@ templ LoginForm(props LoginPageProps) {
 		hx-target="#login-form"
 		hx-swap="outerHTML"
 		class="space-y-4"
+		data-testid="login-form"
 		novalidate
 	>
 		if props.GeneralError != "" {
@@ -52,6 +53,7 @@ templ LoginForm(props LoginPageProps) {
 				ShowIcon:    true,
 				UseOOB:      false,
 				Dismissable: false,
+				TestID:      "login-error",
 			}) {
 				{ props.GeneralError }
 			}

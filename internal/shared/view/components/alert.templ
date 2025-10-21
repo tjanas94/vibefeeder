@@ -28,6 +28,9 @@ templ Alert(props AlertProps) {
 templ alertContent(props AlertProps) {
 	<div
 		class={ "alert", getAlertTypeClass(props.Type), "shadow-lg", "pointer-events-auto" }
+		if props.TestID != "" {
+			data-testid={ props.TestID }
+		}
 		if props.Dismissable {
 			x-data="{ show: true }"
 			x-show="show"

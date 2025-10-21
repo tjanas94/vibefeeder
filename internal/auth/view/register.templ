@@ -20,6 +20,7 @@ templ RegisterForm(props RegisterPageProps) {
 		hx-target="#register-form"
 		hx-swap="outerHTML"
 		class="space-y-4"
+		data-testid="register-form"
 		novalidate
 	>
 		if props.GeneralError != "" {
@@ -28,6 +29,7 @@ templ RegisterForm(props RegisterPageProps) {
 				ShowIcon:    true,
 				UseOOB:      false,
 				Dismissable: false,
+				TestID:      "register-error",
 			}) {
 				{ props.GeneralError }
 			}

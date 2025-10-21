@@ -72,8 +72,14 @@ type FetcherConfig struct {
 }
 
 // Load reads configuration from environment variables
-// It automatically loads .env file if present
+// It automatically loads .env file if present, and .env.test if VIBEFEEDER_TEST is set
 func Load() (*Config, error) {
+	// Load .env.test file if VIBEFEEDER_TEST is set (ignore error if file doesn't exist)
+	// This allows test-specific configuration to override the main .env values
+	if os.Getenv("VIBEFEEDER_TEST") == "true" {
+		_ = godotenv.Load(".env.test")
+	}
+
 	// Load .env file if it exists (ignore error if file doesn't exist)
 	_ = godotenv.Load()
 

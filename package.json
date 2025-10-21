@@ -24,11 +24,13 @@
     "@commitlint/cli": "20.1.0",
     "@commitlint/config-conventional": "20.0.0",
     "@playwright/test": "1.56.1",
+    "@supabase/supabase-js": "2.76.1",
     "@tailwindcss/cli": "4.1.15",
+    "dotenv": "17.2.3",
     "husky": "9.1.7",
     "lint-staged": "16.2.5",
     "prettier": "3.6.2",
-    "supabase": "2.51.0",
+    "supabase": "2.53.6",
     "tailwindcss": "4.1.15"
   },
   "lint-staged": {
