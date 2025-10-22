@@ -4,7 +4,7 @@
  * Supports optional GitHub authentication to avoid rate limiting
  */
 
-const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
+const GITHUB_TOKEN = process.env.E2E_GITHUB_ACCESS_TOKEN;
 const BASE_GITHUB_URL = GITHUB_TOKEN
   ? `https://${GITHUB_TOKEN}@raw.githubusercontent.com`
   : "https://raw.githubusercontent.com";
