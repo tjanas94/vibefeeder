@@ -1,98 +1,98 @@
-# Refactoring Plan: FeedFetcherService
+# Plan Refaktoryzacji: FeedFetcherService
 
-## Problem Statement
+## Uzasadnienie Problemu
 
-`FeedFetcherService` currently violates the Single Responsibility Principle (SRP) by handling multiple concerns:
+`FeedFetcherService` obecnie łamie zasadę pojedynczej odpowiedzialności (SRP), zajmując się wieloma zagadnieniami:
 
-1. Harmonogramowanie i orkiestracja (scheduling + batch processing)
-2. Zarządzanie współbieżnością (worker pool, semaphores, goroutines)
-3. Rate limiting per domain
-4. Komunikacja HTTP i obsługa redirectów
-5. Parsowanie feedów (RSS/Atom)
-6. Logika biznesowa (zapis artykułów, update statusów)
-7. Kalkulacje i strategie retry/backoff
-8. Graceful shutdown
+1.  Harmonogramowanie i orkiestracja (scheduling + batch processing)
+2.  Zarządzanie współbieżnością (worker pool, semafory, goroutines)
+3.  Ograniczanie liczby zapytań na domenę (rate limiting)
+4.  Komunikacja HTTP i obsługa przekierowań
+5.  Parsowanie feedów (RSS/Atom)
+6.  Logika biznesowa (zapis artykułów, aktualizacja statusów)
+7.  Kalkulacje i strategie ponawiania prób (retry/backoff)
+8.  Bezpieczne zamykanie (graceful shutdown)
 
-**Current state:** ~700 linii kodu w `service.go`
+**Stan obecny:** ~700 linii kodu w `service.go`
 
-## Target Architecture
+## Architektura Docelowa
 
 ```
-FeedFetcherService (orchestrator)
-  ├── Scheduler (harmonogramowanie + batch processing)
-  ├── WorkerPool (concurrency management)
-  ├── RateLimiter (domain rate limiting)
-  ├── FeedFetcher (HTTP + parsing)
-  ├── HTTPResponseHandler (status codes logic)
-  ├── FeedStatusManager (update status + save articles)
-  └── Repository (data access)
+FeedFetcherService (orkiestrator)
+  ├── Scheduler (harmonogramowanie + przetwarzanie wsadowe)
+  ├── WorkerPool (zarządzanie współbieżnością)
+  ├── RateLimiter (ograniczanie zapytań na domenę)
+  ├── FeedFetcher (HTTP + parsowanie)
+  ├── HTTPResponseHandler (logika kodów statusu)
+  ├── FeedStatusManager (aktualizacja statusu + zapis artykułów)
+  └── Repository (dostęp do danych)
 ```
 
-## File Structure
+## Struktura Plików
 
 ```
 internal/fetcher/
-├── calculations.go          # PURE FUNCTIONS - timing/backoff calculations only
-├── rate_limiter.go          # NEW - Rate limiting per domain
-├── worker_pool.go           # NEW - Concurrency management
-├── scheduler.go             # NEW - Harmonogramowanie i batch processing
-├── feed_fetcher.go          # NEW - HTTP requests + feed parsing + transformFeedItems()
-├── http_response_handler.go # NEW - Obsługa HTTP status codes
-├── feed_status_manager.go   # NEW - Update statusów + zapis artykułów
-├── models.go                # NEW - Shared types (Article, FetchDecision)
-├── service.go               # REFACTOR - Slim orchestrator
-├── repository.go            # NO CHANGES
-└── http_client.go           # NO CHANGES
+├── calculations.go          # CZYSTE FUNKCJE - tylko obliczenia czasu/backoff
+├── rate_limiter.go          # NOWY - Ograniczanie zapytań na domenę
+├── worker_pool.go           # NOWY - Zarządzanie współbieżnością
+├── scheduler.go             # NOWY - Harmonogramowanie i przetwarzanie wsadowe
+├── feed_fetcher.go          # NOWY - Zapytania HTTP + parsowanie feedów + transformFeedItems()
+├── http_response_handler.go # NOWY - Obsługa kodów statusu HTTP
+├── feed_status_manager.go   # NOWY - Aktualizacja statusów + zapis artykułów
+├── models.go                # NOWY - Współdzielone typy (Article, FetchDecision)
+├── service.go               # REFAKTOR - Odchudzony orkiestrator
+├── repository.go            # BEZ ZMIAN
+└── http_client.go           # BEZ ZMIAN
 ```
 
-## Component Responsibilities
+## Odpowiedzialności Komponentów
 
 ### 1. RateLimiter (`rate_limiter.go`)
 
-**Responsibility:** Zapewnia rate limiting per domain
+**Odpowiedzialność:** Zapewnia ograniczanie liczby zapytań na domenę.
 
-**Key Methods:**
+**Kluczowe Metody:**
 
 - `NewRateLimiter(domainDelay time.Duration) *RateLimiter`
-- `WaitIfNeeded(feedURL string)` - blokuje jeśli zbyt szybko dla danej domeny
+- `WaitIfNeeded(feedURL string)` - blokuje, jeśli zapytanie jest zbyt szybkie dla danej domeny
 
-**State:**
+**Stan:**
 
 - `domainLastRequest map[string]time.Time`
 - `mu sync.Mutex`
 - `domainDelay time.Duration`
 
-**Dependencies:** None (pure Go)
+**Zależności:** Brak (czysty Go)
 
 ---
 
 ### 2. WorkerPool (`worker_pool.go`)
 
-**Responsibility:** Zarządzanie współbieżnością z limitem workerów
+**Odpowiedzialność:** Zarządzanie współbieżnością z limitem workerów.
 
-**Key Methods:**
+**Kluczowe Metody:**
 
 - `NewWorkerPool(workerCount int, logger *slog.Logger) *WorkerPool`
 - `Process(ctx context.Context, items []interface{}, processFn func(interface{}))`
 
-**Features:**
+**Cechy:**
 
-- Semaphore dla limitu workerów
+- Semafor dla limitu workerów
 - WaitGroup dla synchronizacji
-- Panic recovery per worker
-- Context cancellation support
+- Odzyskiwanie po panice dla każdego workera
+- Wsparcie dla anulowania kontekstu
 
-**Dependencies:**
+**Zależności:**
 
-- `log/slog` (logging)
+- `log/slog` (logowanie)
 
 ---
 
 ### 3. HTTPResponseHandler (`http_response_handler.go`)
 
-**Responsibility:** Obsługa różnych HTTP status codes i decyzja o dalszych akcjach
+**Odpowiedzialność:** Obsługa różnych kodów statusu HTTP i podejmowanie decyzji o dalszych akcjach.
 
-**Key Types:**
+**Kluczowe Typy:**
 
 ```go
 type FetchDecision struct {
@@ -107,11 +107,11 @@ type FetchDecision struct {
 }
 ```
 
-**Key Methods:**
+**Kluczowe Metody:**
 
 - `NewHTTPResponseHandler(logger, successInterval) *HTTPResponseHandler`
 - `HandleResponse(resp *http.Response, feed, feedData, retryCount) FetchDecision`
-- Private handlers:
+- Prywatne handlery:
   - `handleSuccess()` - 200 OK
   - `handleNotModified()` - 304
   - `handlePermanentRedirect()` - 301/308
@@ -122,18 +122,18 @@ type FetchDecision struct {
   - `handleClientError()` - 4xx
   - `handleServerError()` - 5xx
 
-**Dependencies:**
+**Zależności:**
 
 - `log/slog`
-- Pure functions z `calculations.go` (calculateNextFetch, calculateBackoff, parseRetryAfter)
+- Czyste funkcje z `calculations.go` (calculateNextFetch, calculateBackoff, parseRetryAfter)
 
 ---
 
 ### 4. FeedFetcher (`feed_fetcher.go`)
 
-**Responsibility:** Wykonywanie HTTP requestów i parsowanie feedów
+**Odpowiedzialność:** Wykonywanie zapytań HTTP i parsowanie feedów.
 
-**Key Types:**
+**Kluczowe Typy:**
 
 ```go
 type FeedData struct {
@@ -142,18 +142,18 @@ type FeedData struct {
 }
 ```
 
-**Key Methods:**
+**Kluczowe Metody:**
 
 - `NewFeedFetcher(httpClient, responseHandler, logger) *FeedFetcher`
 - `Fetch(ctx, feed, retryCount) (FetchDecision, error)` - główna metoda
-- `createRequest(ctx, feed) (*http.Request, error)` - tworzy request z conditional headers
+- `createRequest(ctx, feed) (*http.Request, error)` - tworzy zapytanie z nagłówkami warunkowymi
 - `parseFeed(body io.Reader) (*FeedData, error)` - parsuje RSS/Atom
 
-**Package-level Functions:**
+**Funkcje na poziomie pakietu:**
 
-- `transformFeedItems(items, now) []Article` - transforms gofeed.Item to Article
+- `transformFeedItems(items, now) []Article` - transformuje gofeed.Item na Article
 
-**Dependencies:**
+**Zależności:**
 
 - `HTTPClient` (http_client.go)
 - `HTTPResponseHandler`
@@ -164,21 +164,21 @@ type FeedData struct {
 
 ### 5. FeedStatusManager (`feed_status_manager.go`)
 
-**Responsibility:** Aktualizacja statusów feedów i zapis artykułów
+**Odpowiedzialność:** Aktualizacja statusów feedów i zapis artykułów.
 
-**Key Methods:**
+**Kluczowe Metody:**
 
 - `NewFeedStatusManager(repo, logger) *FeedStatusManager`
 - `ApplyDecision(ctx, feed, decision) error` - główna metoda
-- `saveArticles(ctx, feedID, articles) error` - private helper
+- `saveArticles(ctx, feedID, articles) error` - prywatny pomocnik
 
-**Logic:**
+**Logika:**
 
-1. Zapisuje artykuły jeśli są (non-blocking - nie failuje całej operacji)
-2. Aktualizuje status feeda w DB
-3. Resetuje retry_count jeśli sukces
+1.  Zapisuje artykuły, jeśli istnieją (nie blokuje całej operacji w razie błędu)
+2.  Aktualizuje status feeda w bazie danych
+3.  Resetuje `retry_count` w przypadku sukcesu
 
-**Dependencies:**
+**Zależności:**
 
 - `Repository`
 - `log/slog`
@@ -187,27 +187,27 @@ type FeedData struct {
 
 ### 6. Scheduler (`scheduler.go`)
 
-**Responsibility:** Harmonogramowanie i orkiestracja batch processingu
+**Odpowiedzialność:** Harmonogramowanie i orkiestracja przetwarzania wsadowego.
 
-**Key Methods:**
+**Kluczowe Metody:**
 
 - `NewScheduler(repo, workerPool, rateLimiter, feedFetcher, statusManager, logger, config, appCtx) *Scheduler`
 - `Start()` - główna pętla z tickerem
-- `ProcessBatch()` - pobiera i przetwarza batch feedów
+- `ProcessBatch()` - pobiera i przetwarza wsad feedów
 - `processSingleFeed(feed)` - przetwarza pojedynczy feed
-- `handleFetchError(feed, err)` - obsługa błędów HTTP/network
+- `handleFetchError(feed, err)` - obsługa błędów HTTP/sieciowych
 
-**Flow:**
+**Przepływ:**
 
-1. Ticker co X minut
-2. FindFeedsDueForFetch()
-3. WorkerPool.Process() dla wszystkich feedów
-4. Dla każdego feeda:
-   - RateLimiter.WaitIfNeeded()
-   - FeedFetcher.Fetch()
-   - FeedStatusManager.ApplyDecision()
+1.  Ticker co X minut
+2.  `FindFeedsDueForFetch()`
+3.  `WorkerPool.Process()` dla wszystkich feedów
+4.  Dla każdego feeda:
+    - `RateLimiter.WaitIfNeeded()`
+    - `FeedFetcher.Fetch()`
+    - `FeedStatusManager.ApplyDecision()`
 
-**Dependencies:**
+**Zależności:**
 
 - `Repository`
 - `WorkerPool`
@@ -221,15 +221,15 @@ type FeedData struct {
 
 ### 7. FeedFetcherService (`service.go`)
 
-**Responsibility:** Główny orchestrator, dependency injection, public API
+**Odpowiedzialność:** Główny orkiestrator, wstrzykiwanie zależności, publiczne API.
 
-**Key Methods:**
+**Kluczowe Metody:**
 
-- `NewFeedFetcherService(dbClient, logger, cfg, appCtx) *FeedFetcherService` - setup wszystkich komponentów
-- `Start()` - deleguje do Scheduler.Start()
-- `FetchFeedNow(feedID string)` - bezpośrednie użycie FeedFetcher (async)
+- `NewFeedFetcherService(dbClient, logger, cfg, appCtx) *FeedFetcherService` - konfiguracja wszystkich komponentów
+- `Start()` - deleguje do `Scheduler.Start()`
+- `FetchFeedNow(feedID string)` - bezpośrednie użycie `FeedFetcher` (asynchronicznie)
 
-**State:**
+**Stan:**
 
 ```go
 type FeedFetcherService struct {
@@ -242,15 +242,15 @@ type FeedFetcherService struct {
 }
 ```
 
-**Dependencies:** Wszystkie komponenty (tworzy je w konstruktorze)
+**Zależności:** Wszystkie komponenty (tworzy je w konstruktorze)
 
 ---
 
 ### 8. Models (`models.go`)
 
-**Responsibility:** Współdzielone typy używane przez wiele komponentów
+**Odpowiedzialność:** Współdzielone typy używane przez wiele komponentów.
 
-**Types:**
+**Typy:**
 
 ```go
 type Article struct {
@@ -276,92 +276,90 @@ type FetchDecision struct {
 
 ### 9. Calculations (`calculations.go`)
 
-**Responsibility:** Pure mathematical/timing calculations for feed fetching
+**Odpowiedzialność:** Czyste matematyczne/czasowe kalkulacje dla pobierania feedów.
 
-**Package-level Pure Functions:**
+**Funkcje czyste na poziomie pakietu:**
 
 ```go
-// Timing calculations
+// Obliczenia czasowe
 func calculateNextFetch(cacheControl string, successInterval time.Duration, now time.Time) time.Time
 func parseCacheControlMaxAge(cacheControl string) (time.Duration, bool)
 
-// Retry strategy
+// Strategia ponawiania
 func calculateBackoff(retryCount int, now time.Time) time.Time
 func parseRetryAfter(retryAfter string, retryCount int, now time.Time) time.Time
 ```
 
-**Note:** `transformFeedItems()` has been **moved to `feed_fetcher.go`** as it's a transformation/mapping function, not a calculation.
+**Uwaga:** `transformFeedItems()` zostało **przeniesione do `feed_fetcher.go`**, ponieważ jest to funkcja transformacji/mapowania, a nie kalkulacja.
 
-**Dependencies:** None (pure Go stdlib)
+**Zależności:** Brak (czysta biblioteka standardowa Go)
 
 ---
 
-## Migration Steps
+## Kroki Migracji
 
-### Phase 1: Extraction (without breaking changes)
+### Faza 1: Ekstrakcja (bez łamania zmian)
 
-1. ✅ Create `models.go` - extract Article type
-2. ✅ Create `rate_limiter.go` - extract rate limiting logic
-3. ✅ Create `worker_pool.go` - extract concurrency management
-4. ✅ Create `http_response_handler.go` - extract HTTP response handling
-5. ✅ Create `feed_fetcher.go` - extract fetching + parsing
-6. ✅ Create `feed_status_manager.go` - extract status updates
-7. ✅ Create `scheduler.go` - extract scheduling logic
+1.  ✅ Utwórz `models.go` - wydziel typ `Article`
+2.  ✅ Utwórz `rate_limiter.go` - wydziel logikę ograniczania zapytań
+3.  ✅ Utwórz `worker_pool.go` - wydziel zarządzanie współbieżnością
+4.  ✅ Utwórz `http_response_handler.go` - wydziel obsługę odpowiedzi HTTP
+5.  ✅ Utwórz `feed_fetcher.go` - wydziel pobieranie + parsowanie
+6.  ✅ Utwórz `feed_status_manager.go` - wydziel aktualizacje statusu
+7.  ✅ Utwórz `scheduler.go` - wydziel logikę harmonogramu
 
-### Phase 2: Integration
+### Faza 2: Integracja
 
-8. ✅ Refactor `service.go` to use new components
-9. ✅ Update tests to work with new structure
-10. ✅ Verify all functionality works
+8.  ✅ Zrefaktoryzuj `service.go`, aby używał nowych komponentów
+9.  ✅ Zaktualizuj testy jednostkowe, aby działały z nową strukturą
+10. ✅ Zweryfikuj, czy cała funkcjonalność działa
 
-### Phase 3: Cleanup
+### Faza 3: Czyszczenie
 
-11. ✅ Remove old code from `service.go`
-12. ✅ Update documentation
-13. ✅ Run linters and formatters
+11. ✅ Usuń stary kod z `service.go`
+12. ✅ Zaktualizuj dokumentację
+13. ✅ Uruchom lintery i formatery
 
-## Testing Strategy
+## Strategia Testowania
 
-### Unit Tests
+### Testy Jednostkowe
 
-Each component should be independently testable:
+Każdy komponent powinien być niezależnie testowalny:
 
-- **RateLimiter**: Test with mock time, verify delays
-- **WorkerPool**: Test concurrency limits, panic recovery, context cancellation
-- **HTTPResponseHandler**: Test all status codes, verify correct decisions
-- **FeedFetcher**: Mock HTTPClient, test parsing logic
-- **FeedStatusManager**: Mock Repository, verify DB updates
-- **Scheduler**: Mock all dependencies, test orchestration
+- **RateLimiter**: Test z mockowanym czasem, weryfikacja opóźnień
+- **WorkerPool**: Test limitów współbieżności, odzyskiwania po panice, anulowania kontekstu
+- **HTTPResponseHandler**: Test wszystkich kodów statusu, weryfikacja poprawnych decyzji
+- **FeedFetcher**: Mock `HTTPClient`, test logiki parsowania
+- **FeedStatusManager**: Mock `Repository`, weryfikacja aktualizacji w bazie danych
+- **Scheduler**: Mock wszystkich zależności, test orkiestracji
 
-### Integration Tests
+### Testy E2E
 
-- Test full flow: Scheduler → WorkerPool → RateLimiter → FeedFetcher → StatusManager
-- Test graceful shutdown
-- Test error scenarios
+- Po refaktoryzacji, istniejące testy E2E (end-to-end) muszą przechodzić bez żadnych modyfikacji.
+- Gwarantuje to, że publiczne API i zachowanie całego systemu z perspektywy użytkownika końcowego nie uległy zmianie.
 
-## Benefits
+## Korzyści
 
-✅ **Single Responsibility** - każdy komponent ma jedną odpowiedzialność  
-✅ **Testability** - małe, izolowane komponenty z mock'owalnymi dependencies  
-✅ **Maintainability** - zmiany w jednym miejscu nie wpływają na inne  
-✅ **Readability** - pliki po ~70-150 linii zamiast 700  
-✅ **Extensibility** - łatwe dodawanie nowych features (np. inne strategie retry)  
-✅ **Pure functions preserved** - `calculations.go` pozostaje bez zmian  
-✅ **Clear dependencies** - każdy komponent ma jasno zdefiniowane zależności
+✅ **Pojedyncza odpowiedzialność** - każdy komponent ma jedną odpowiedzialność  
+✅ **Testowalność** - małe, izolowane komponenty z mockowalnymi zależnościami  
+✅ **Utrzymywalność** - zmiany w jednym miejscu nie wpływają na inne  
+✅ **Czytelność** - pliki po ~70-150 linii zamiast 700  
+✅ **Rozszerzalność** - łatwe dodawanie nowych funkcji (np. inne strategie ponawiania)  
+✅ **Zachowane czyste funkcje** - `calculations.go` pozostaje bez zmian  
+✅ **Jasne zależności** - każdy komponent ma jasno zdefiniowane zależności
 
-## Notes
+## Uwagi
 
-### Pure Functions Strategy
-
-- **calculations.go** - tylko czyste kalkulacje (timing, backoff, HTTP header parsing) - NIE ROBIMY ICH OBIEKTOWO
-- **transformFeedItems()** - przeniesione z `calculations.go` do `feed_fetcher.go` jako **package-level pure function (bez receivera)**
-  - Powód: semantycznie to transformacja/mapping, nie calculation
-  - Pozostaje pure function dla łatwego testowania
-  - Blisko miejsca użycia (parseFeed)
-- Zachowujemy functional programming style tam gdzie ma sens
-- Zachowujemy istniejące public API dla kompatybilności wstecznej
-- Graceful shutdown musi działać we wszystkich komponentach
-- Rate limiting per domain jest krytyczny - nie gubić tego w refactoringu
-- Panic recovery w workerach jest kluczowy dla stability
-- SSRF protection pozostaje w HTTPClient (http_client.go) w transport layer
-- Error handling (SSRF vs network errors) będzie w FeedStatusManager
+- **Strategia czystych funkcji**:
+  - `calculations.go` - tylko czyste kalkulacje (timing, backoff, parsowanie nagłówków HTTP) - NIE TWORZYMY Z NICH OBIEKTÓW
+  - `transformFeedItems()` - przeniesione z `calculations.go` do `feed_fetcher.go` jako **czysta funkcja na poziomie pakietu (bez receivera)**
+    - Powód: semantycznie to transformacja/mapowanie, a nie kalkulacja
+    - Pozostaje czystą funkcją dla łatwego testowania
+    - Blisko miejsca użycia (`parseFeed`)
+- Zachowujemy styl programowania funkcyjnego tam, gdzie ma to sens
+- Zachowujemy istniejące publiczne API dla kompatybilności wstecznej
+- Bezpieczne zamykanie (graceful shutdown) musi działać we wszystkich komponentach
+- Ograniczanie zapytań na domenę jest krytyczne - nie można tego zgubić w refaktoryzacji
+- Odzyskiwanie po panice w workerach jest kluczowe dla stabilności
+- Ochrona przed SSRF pozostaje w `HTTPClient` (`http_client.go`) w warstwie transportowej
+- Obsługa błędów (SSRF vs błędy sieciowe) będzie w `FeedStatusManager`

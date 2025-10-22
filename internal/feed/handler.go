@@ -166,6 +166,7 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 	}
 
 	// Success - refresh feed list, close modal and show toast
+	c.Response().Header().Set("HX-Reswap", "none")
 	c.Response().Header().Set("HX-Trigger", `{"refreshFeedList": null, "closeModal": null}`)
 	return c.Render(http.StatusOK, "", sharedview.Toast(sharedview.ToastProps{
 		Type:    "success",
@@ -286,6 +287,7 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 	}
 
 	// Success - refresh feed list, close modal and show toast
+	c.Response().Header().Set("HX-Reswap", "none")
 	c.Response().Header().Set("HX-Trigger", `{"refreshFeedList": null, "closeModal": null}`)
 	return c.Render(http.StatusOK, "", sharedview.Toast(sharedview.ToastProps{
 		Type:    "success",
@@ -402,6 +404,7 @@ func (h *Handler) DeleteFeed(c echo.Context) error {
 	}
 
 	// Success - refresh feed list, close modal and show toast
+	c.Response().Header().Set("HX-Reswap", "none")
 	c.Response().Header().Set("HX-Trigger", `{"refreshFeedList": null, "closeModal": null}`)
 	return c.Render(http.StatusOK, "", sharedview.Toast(sharedview.ToastProps{
 		Type:    "success",

@@ -1,6 +1,6 @@
 import { test as base } from "@playwright/test";
-import { AuthPage } from "../pages/auth.page";
-import { DashboardPage } from "../pages/dashboard.page";
+import { AuthPage } from "../pages/auth.page.ts";
+import { DashboardPage } from "../pages/dashboard.page.ts";
 
 /**
  * Test fixtures for authentication-related tests

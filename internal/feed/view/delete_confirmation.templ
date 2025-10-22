@@ -11,7 +11,7 @@ import (
 // Takes feed data from server-side view model instead of Alpine.js state.
 templ DeleteConfirmation(vm models.DeleteConfirmationViewModel) {
 	<h3 id="delete-confirmation-modal-title" class="font-bold text-lg mb-4">Confirm deletion</h3>
-	<article class="space-y-4" role="alertdialog" aria-labelledby="delete-confirmation-modal-title" aria-describedby="delete-description">
+	<article class="space-y-4" role="alertdialog" aria-labelledby="delete-confirmation-modal-title" aria-describedby="delete-description" data-testid="delete-confirmation">
 		<!-- Warning Message -->
 		<div>
 			@components.Alert(components.AlertProps{
@@ -20,7 +20,7 @@ templ DeleteConfirmation(vm models.DeleteConfirmationViewModel) {
 			}) {
 				<div>
 					<p class="font-semibold">Are you sure you want to delete this feed?</p>
-					<p class="text-sm">
+					<p class="text-sm" data-testid={ fmt.Sprintf("delete-confirmation-feed-name-%s", vm.FeedID) }>
 						Feed: <span class="font-medium">{ vm.FeedName }</span>
 					</p>
 				</div>
@@ -32,7 +32,7 @@ templ DeleteConfirmation(vm models.DeleteConfirmationViewModel) {
 		</p>
 		<!-- Error Display -->
 		if vm.ErrorMessage != "" {
-			<div role="alert" aria-live="assertive" aria-atomic="true">
+			<div role="alert" aria-live="assertive" aria-atomic="true" data-testid="delete-confirmation-error">
 				@components.Alert(components.AlertProps{
 					Type:     "error",
 					ShowIcon: true,
@@ -48,6 +48,7 @@ templ DeleteConfirmation(vm models.DeleteConfirmationViewModel) {
 				class="btn btn-ghost focus:outline focus:outline-2 focus:outline-offset-2"
 				@click="window.dispatchEvent(new CustomEvent('close-modal'))"
 				aria-label="Cancel deletion and close the dialog"
+				data-testid="delete-confirmation-cancel-btn"
 			>
 				Cancel
 			</button>
@@ -59,6 +60,7 @@ templ DeleteConfirmation(vm models.DeleteConfirmationViewModel) {
 				hx-target="#delete-confirmation-modal-content"
 				hx-swap="innerHTML"
 				aria-label={ fmt.Sprintf("Confirm deletion of feed %s", vm.FeedName) }
+				data-testid={ fmt.Sprintf("delete-confirmation-confirm-btn-%s", vm.FeedID) }
 			>
 				@components.ButtonLoader(components.ButtonLoaderProps{})
 				<span>Delete feed</span>

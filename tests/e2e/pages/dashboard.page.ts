@@ -1,5 +1,5 @@
-import { Page, Locator } from "@playwright/test";
-import { BasePage } from "./base.page";
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page.ts";
 
 /**
  * DashboardPage - Page Object for the main dashboard

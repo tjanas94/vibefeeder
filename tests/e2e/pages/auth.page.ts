@@ -1,5 +1,5 @@
-import { Page, Locator } from "@playwright/test";
-import { BasePage } from "./base.page";
+import type { Page, Locator } from "@playwright/test";
+import { BasePage } from "./base.page.ts";
 
 /**
  * AuthPage - Page Object for authentication pages
@@ -44,8 +44,8 @@ export class AuthPage extends BasePage {
    * Perform login action
    */
   async login(email: string, password: string): Promise<void> {
-    await this.emailInput.fill(email);
-    await this.passwordInput.fill(password);
+    await this.fillInput(this.emailInput, email);
+    await this.fillInput(this.passwordInput, password);
     await this.loginButton.click();
   }
 

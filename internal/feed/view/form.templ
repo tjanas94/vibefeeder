@@ -27,6 +27,8 @@ templ FeedForm(vm models.FeedFormViewModel) {
 		hx-swap="innerHTML"
 		class="space-y-4"
 		aria-labelledby="feed-form-modal-title"
+		data-testid="feed-form"
+		novalidate
 	>
 		<input type="hidden" name="csrf_token" value={ csrf.Token(ctx) }/>
 		<fieldset class="space-y-4">
@@ -41,6 +43,7 @@ templ FeedForm(vm models.FeedFormViewModel) {
 				Placeholder: "My favorite blog",
 				Error:       vm.Errors.NameError,
 				Required:    true,
+				TestID:      "feed-form-name-input",
 			})
 			<!-- URL Field -->
 			@components.FormField(components.FormFieldProps{
@@ -52,6 +55,7 @@ templ FeedForm(vm models.FeedFormViewModel) {
 				Placeholder: "https://example.com/feed.xml",
 				Error:       vm.Errors.URLError,
 				Required:    true,
+				TestID:      "feed-form-url-input",
 			})
 		</fieldset>
 		<!-- Error Container for form-level errors -->
@@ -60,6 +64,7 @@ templ FeedForm(vm models.FeedFormViewModel) {
 			role="alert"
 			aria-live="polite"
 			aria-atomic="true"
+			data-testid="feed-form-error"
 		>
 			if vm.Errors.GeneralError != "" {
 				@components.Alert(components.AlertProps{
@@ -77,6 +82,7 @@ templ FeedForm(vm models.FeedFormViewModel) {
 				class="btn btn-ghost"
 				@click="window.dispatchEvent(new CustomEvent('close-modal'))"
 				aria-label="Cancel and close the form"
+				data-testid="feed-form-cancel-btn"
 			>
 				Cancel
 			</button>
@@ -84,6 +90,7 @@ templ FeedForm(vm models.FeedFormViewModel) {
 				type="submit"
 				class="btn btn-primary min-w-[100px] inline-flex items-center gap-2"
 				aria-label="Save feed"
+				data-testid="feed-form-submit-btn"
 			>
 				@components.ButtonLoader(components.ButtonLoaderProps{})
 				<span>Save</span>

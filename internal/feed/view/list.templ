@@ -93,6 +93,7 @@ templ FeedSearchFilter(props FeedSearchFilterProps) {
 		hx-trigger="change from:input[type=radio], keyup changed delay:500ms from:input[type=search], search from:input[type=search], refreshFeedList from:document"
 		role="search"
 		aria-label="Search and filter feeds"
+		data-testid="feed-filter-form"
 	>
 		<!-- Filter fields wrapper -->
 		<div class="flex flex-col sm:flex-row gap-4 items-stretch">
@@ -106,6 +107,7 @@ templ FeedSearchFilter(props FeedSearchFilterProps) {
 				class="input input-bordered w-full sm:grow"
 				value={ props.Search }
 				aria-label="Search feeds by name"
+				data-testid="feed-search-input"
 			/>
 			<!-- Status Filter Radio Buttons (styled as buttons) -->
 			@components.StatusFilterGroup(components.StatusFilterGroupProps{
@@ -124,15 +126,15 @@ templ FeedSearchFilter(props FeedSearchFilterProps) {
 
 // FeedListItem renders a single feed row in the table
 templ FeedListItem(feed models.FeedItemViewModel) {
-	<tr>
+	<tr data-testid={ fmt.Sprintf("feed-list-item-%s", feed.ID) }>
 		<!-- Feed Name -->
-		<th scope="row" class="font-medium">{ feed.Name }</th>
+		<th scope="row" class="font-medium" data-testid={ fmt.Sprintf("feed-name-%s", feed.ID) }>{ feed.Name }</th>
 		<!-- Feed URL -->
-		<td class="text-sm text-base-content/70 max-w-md truncate">
+		<td class="text-sm text-base-content/70 max-w-md truncate" data-testid={ fmt.Sprintf("feed-url-%s", feed.ID) }>
 			<span title={ feed.URL }>{ feed.URL }</span>
 		</td>
 		<!-- Status with Error Tooltip -->
-		<td>
+		<td data-testid={ fmt.Sprintf("feed-status-%s", feed.ID) }>
 			if feed.HasError {
 				@components.Badge(components.BadgeProps{
 					Text:    "Error",
@@ -170,6 +172,7 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 						hx-target="#feed-form-modal-content"
 						hx-trigger="click"
 						aria-label={ fmt.Sprintf("Edit feed %s", feed.Name) }
+						data-testid={ fmt.Sprintf("feed-edit-btn-%s", feed.ID) }
 					>
 						<span class="absolute -left-2 top-1/2 -translate-y-1/2">
 							@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
@@ -190,6 +193,7 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 						hx-target="#delete-confirmation-modal-content"
 						hx-trigger="click"
 						aria-label={ fmt.Sprintf("Delete feed %s", feed.Name) }
+						data-testid={ fmt.Sprintf("feed-delete-btn-%s", feed.ID) }
 					>
 						<span class="absolute -left-2 top-1/2 -translate-y-1/2">
 							@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
@@ -204,12 +208,12 @@ templ FeedListItem(feed models.FeedItemViewModel) {
 
 // FeedCard renders a single feed as a card for mobile view
 templ FeedCard(feed models.FeedItemViewModel) {
-	<div class="card bg-base-200 shadow-md">
+	<div class="card bg-base-200 shadow-md" data-testid={ fmt.Sprintf("feed-card-%s", feed.ID) }>
 		<div class="card-body p-4">
 			<!-- Header: Name and Status -->
 			<div class="flex items-start justify-between gap-2 mb-2">
-				<h2 class="card-title text-base">{ feed.Name }</h2>
-				<div class="flex-shrink-0">
+				<h2 class="card-title text-base" data-testid={ fmt.Sprintf("feed-name-%s", feed.ID) }>{ feed.Name }</h2>
+				<div class="flex-shrink-0" data-testid={ fmt.Sprintf("feed-status-%s", feed.ID) }>
 					if feed.HasError {
 						@components.Badge(components.BadgeProps{
 							Text:    "Error",
@@ -233,7 +237,7 @@ templ FeedCard(feed models.FeedItemViewModel) {
 				</div>
 			</div>
 			<!-- URL -->
-			<p class="text-sm text-base-content/70 break-all mb-3">{ feed.URL }</p>
+			<p class="text-sm text-base-content/70 break-all mb-3" data-testid={ fmt.Sprintf("feed-url-%s", feed.ID) }>{ feed.URL }</p>
 			<!-- Actions -->
 			<div class="card-actions justify-end">
 				<button
@@ -244,6 +248,7 @@ templ FeedCard(feed models.FeedItemViewModel) {
 					hx-target="#feed-form-modal-content"
 					hx-trigger="click"
 					aria-label={ fmt.Sprintf("Edit feed %s", feed.Name) }
+					data-testid={ fmt.Sprintf("feed-edit-btn-%s", feed.ID) }
 				>
 					<span class="absolute -left-2 top-1/2 -translate-y-1/2">
 						@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})
@@ -259,6 +264,7 @@ templ FeedCard(feed models.FeedItemViewModel) {
 					hx-target="#delete-confirmation-modal-content"
 					hx-trigger="click"
 					aria-label={ fmt.Sprintf("Delete feed %s", feed.Name) }
+					data-testid={ fmt.Sprintf("feed-delete-btn-%s", feed.ID) }
 				>
 					<span class="absolute -left-2 top-1/2 -translate-y-1/2">
 						@components.ButtonLoader(components.ButtonLoaderProps{Size: "sm"})

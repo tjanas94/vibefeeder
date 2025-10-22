@@ -4,7 +4,7 @@ package components
 // Used within a .join container for DaisyUI button groups
 // Uses label wrapper with visible text for better accessibility
 templ StatusFilterButton(props StatusFilterButtonProps) {
-	<label class="join-item btn btn-neutral has-[:checked]:btn-secondary cursor-pointer flex-1 whitespace-nowrap sm:flex-initial">
+	<label class="join-item btn btn-neutral has-[:checked]:btn-secondary cursor-pointer flex-1 whitespace-nowrap sm:flex-initial" data-testid={ "status-filter-" + props.Value }>
 		<input
 			type="radio"
 			name={ props.Name }

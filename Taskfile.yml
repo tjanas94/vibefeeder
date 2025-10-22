@@ -128,15 +128,25 @@ tasks:
     desc: Run all linters
     deps:
       - lint:go
+      - lint:eslint
       - lint:prettier
+      - lint:typescript
 
   lint:go:
     desc: Run Go linters
     cmd: golangci-lint run
 
+  lint:eslint:
+    desc: Run ESLint
+    cmd: node_modules/.bin/eslint .
+
   lint:prettier:
     desc: Check formatting with Prettier
     cmd: node_modules/.bin/prettier --check .
+
+  lint:typescript:
+    desc: Check TypeScript types
+    cmd: node_modules/.bin/tsc
 
   fmt:
     desc: Format all code

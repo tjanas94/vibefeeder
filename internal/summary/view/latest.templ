@@ -30,6 +30,7 @@ templ GenerateSummaryAction(props GenerateSummaryActionProps) {
 			type="submit"
 			class={ "btn btn-primary hide-during-request", props.ButtonSize }
 			aria-label={ props.AriaLabel }
+			data-testid="summary-generate-button"
 		>
 			{ props.ButtonText }
 		</button>
@@ -53,6 +54,7 @@ templ Display(vm models.SummaryDisplayViewModel) {
 		aria-labelledby="summary-modal-title"
 		aria-live="polite"
 		class="space-y-4"
+		data-testid="summary-modal-content"
 	>
 		<h3 id="summary-modal-title" tabindex="-1" class="font-bold text-xl">
 			Daily Summary
@@ -77,10 +79,10 @@ templ Display(vm models.SummaryDisplayViewModel) {
 // Renders the existing summary content and metadata.
 // Shows "Generate New Summary" if the user can generate another summary.
 templ Content(props ContentProps) {
-	<article class="prose max-w-none" aria-label="AI generated summary">
+	<article class="prose max-w-none" aria-label="AI generated summary" data-testid="summary-content">
 		<p class="text-sm text-base-content/70 mb-4">
 			Generated at
-			<time datetime={ props.Summary.CreatedAt.Format(time.RFC3339) }>
+			<time datetime={ props.Summary.CreatedAt.Format(time.RFC3339) } data-testid="summary-timestamp">
 				{ props.Summary.CreatedAt.Local().Format("Jan 2, 2006 15:04") }
 			</time>
 		</p>
@@ -112,25 +114,27 @@ templ Content(props ContentProps) {
 //
 // Encourages the user to generate their first summary.
 templ EmptyState(props EmptyStateProps) {
-	if props.CanGenerate {
-		@components.EmptyStateWithAction(components.EmptyStateWithActionProps{
-			Icon:        "📝",
-			Title:       "No summary generated yet",
-			Description: "Generate a daily summary to get a concise overview of the most recent content from your subscribed feeds.",
-		}) {
-			@GenerateSummaryAction(GenerateSummaryActionProps{
-				ButtonText: "Generate Summary",
-				AriaLabel:  "Generate your first AI summary",
-				ButtonSize: "",
+	<div data-testid="summary-empty-state">
+		if props.CanGenerate {
+			@components.EmptyStateWithAction(components.EmptyStateWithActionProps{
+				Icon:        "📝",
+				Title:       "No summary generated yet",
+				Description: "Generate a daily summary to get a concise overview of the most recent content from your subscribed feeds.",
+			}) {
+				@GenerateSummaryAction(GenerateSummaryActionProps{
+					ButtonText: "Generate Summary",
+					AriaLabel:  "Generate your first AI summary",
+					ButtonSize: "",
+				})
+			}
+		} else {
+			@components.EmptyState(components.EmptyStateProps{
+				Icon:        "📝",
+				Title:       "No summary generated yet",
+				Description: "Add a feed first, then return here to generate your first summary.",
 			})
 		}
-	} else {
-		@components.EmptyState(components.EmptyStateProps{
-			Icon:        "📝",
-			Title:       "No summary generated yet",
-			Description: "Add a feed first, then return here to generate your first summary.",
-		})
-	}
+	</div>
 }
 
 // =============
@@ -139,15 +143,17 @@ templ EmptyState(props EmptyStateProps) {
 //
 // Renders an error message with retry action. Assumes user can still generate.
 templ Error(vm models.SummaryErrorViewModel) {
-	@components.EmptyStateWithAction(components.EmptyStateWithActionProps{
-		Icon:        "⚠️",
-		Title:       "Failed to generate summary",
-		Description: vm.ErrorMessage,
-	}) {
-		@GenerateSummaryAction(GenerateSummaryActionProps{
-			ButtonText: "Try Again",
-			AriaLabel:  "Try generating the AI summary again",
-			ButtonSize: "",
-		})
-	}
+	<div data-testid="summary-error-state">
+		@components.EmptyStateWithAction(components.EmptyStateWithActionProps{
+			Icon:        "⚠️",
+			Title:       "Failed to generate summary",
+			Description: vm.ErrorMessage,
+		}) {
+			@GenerateSummaryAction(GenerateSummaryActionProps{
+				ButtonText: "Try Again",
+				AriaLabel:  "Try generating the AI summary again",
+				ButtonSize: "",
+			})
+		}
+	</div>
 }

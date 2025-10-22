@@ -16,8 +16,8 @@ max_line_length = 100
 indent_style = tab
 indent_size = 4
 
-# JavaScript, JSON, CSS, YAML, TOML, Markdown
-[*.{js,json,css,yml,yaml,toml,md}]
+# JavaScript, TypeScript, JSON, CSS, YAML, TOML, Markdown
+[*.{js,ts,json,css,yml,yaml,toml,md}]
 indent_style = space
 indent_size = 2
 
