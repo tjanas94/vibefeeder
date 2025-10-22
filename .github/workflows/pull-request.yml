@@ -1,0 +1,137 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: .go-version
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
+      - uses: go-task/setup-task@v1
+
+      - name: Install dependencies
+        run: task install-deps:ci
+
+      - name: Install yamllint
+        run: apt-get update && apt-get install -y yamllint
+
+      - name: Lint YAML workflows
+        run: task lint:yaml
+
+      - name: Lint Go
+        uses: golangci/golangci-lint-action@v8
+        if: always()
+
+      - name: Lint ESLint
+        run: task lint:eslint
+        if: always()
+
+      - name: Lint Prettier
+        run: task lint:prettier
+        if: always()
+
+      - name: Lint TypeScript
+        run: task lint:typescript
+        if: always()
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    environment: integration
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: .go-version
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+
+      - uses: go-task/setup-task@v1
+
+      - name: Install dependencies
+        run: task install-deps:ci
+
+      - name: Run unit tests
+        run: task test:unit
+
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-unit
+          path: coverage.out
+          retention-days: 1
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: task test:e2e
+        env:
+          CI: "true"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          E2E_USERNAME_ID: ${{ secrets.E2E_USERNAME_ID }}
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_ACCESS_TOKEN }}
+
+      - name: Upload E2E test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  status-comment:
+    name: Status Comment
+    runs-on: ubuntu-latest
+    needs: [lint, tests]
+    if: always()
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Determine status
+        id: status
+        run: |
+          if [[ "${{ needs.lint.result }}" == "success" && "${{ needs.tests.result }}" == "success" ]]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "message=✅ All checks passed! Lint and tests are green." >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "message=❌ Some checks failed. Please review the logs." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: always()
+        with:
+          header: pr-check-status
+          message: |
+            ## Workflow Status
+            ${{ steps.status.outputs.message }}
+
+            **Details:**
+            - **Lint:** `${{ needs.lint.result }}`
+            - **Tests:** `${{ needs.tests.result }}`
+
+            [View full logs →](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

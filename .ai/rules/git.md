@@ -1,17 +1,12 @@
-## TESTING
+## CODING_PRACTICES
 
-### Guidelines for E2E
+### Guidelines for VERSION_CONTROL
 
-#### PLAYWRIGHT
+#### GIT
 
-- Initialize configuration only with Chromium/Desktop Chrome browser
-- Use browser contexts for isolating test environments
-- Implement the Page Object Model for maintainable tests
-- Use locators for resilient element selection
-- Leverage API testing for backend validation
-- Implement visual comparison with expect(page).toHaveScreenshot()
-- Use the codegen tool for test recording
-- Leverage trace viewer for debugging test failures
-- Implement test hooks for setup and teardown
-- Use expect assertions with specific matchers
-- Leverage parallel execution for faster test runs
+- Use conventional commits to create meaningful commit messages
+- Use feature branches with descriptive names following {{branch_naming_convention}}
+- Write meaningful commit messages that explain why changes were made, not just what
+- Keep commits focused on single logical changes to facilitate code review and bisection
+- Use interactive rebase to clean up history before merging feature branches
+- Leverage git hooks to enforce code quality checks before commits and pushes

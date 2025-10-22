@@ -1,0 +1,42 @@
+---
+extends: default
+
+ignore: |
+  node_modules/
+  dist/
+
+rules:
+  # Line length: increase from 80 to 120 for better readability in GitHub Actions
+  line-length:
+    max: 120
+    level: warning
+
+  # Indentation: disable multi-line string checks (common in GitHub Actions)
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Document start: disable mandatory --- (not required by GitHub Actions)
+  document-start: disable
+
+  # Truthy values: allow both true/false and on/off (GitHub Actions compatibility)
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off']
+    check-keys: false
+
+  # Quoted strings: allow both styles for flexibility
+  quoted-strings: disable
+
+  # Comments: ensure proper spacing
+  comments:
+    min-spaces-from-content: 2
+
+  # Empty lines: limit to 1 between sections
+  empty-lines:
+    max: 1
+    max-start: 0
+    max-end: 0
+
+  # Key ordering: disable for flexibility in workflow organization
+  key-ordering: disable

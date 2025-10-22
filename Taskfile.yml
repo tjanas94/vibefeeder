@@ -52,6 +52,12 @@ tasks:
       - npm install
       - go mod tidy
 
+  install-deps:ci:
+    desc: Install dependencies (CI - fast and deterministic)
+    cmds:
+      - npm ci --prefer-offline --no-audit --no-fund --ignore-scripts --loglevel error
+      - go mod download
+
   run:
     desc: Run the built binary
     deps:
@@ -131,10 +137,15 @@ tasks:
       - lint:eslint
       - lint:prettier
       - lint:typescript
+      - lint:yaml
 
   lint:go:
     desc: Run Go linters
     cmd: golangci-lint run
+
+  lint:yaml:
+    desc: Lint YAML files
+    cmd: yamllint .
 
   lint:eslint:
     desc: Run ESLint
