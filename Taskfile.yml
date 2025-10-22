@@ -57,6 +57,7 @@ tasks:
     cmds:
       - npm ci --prefer-offline --no-audit --no-fund --ignore-scripts --loglevel error
       - go mod download
+      - go install github.com/a-h/templ/cmd/templ@latest
 
   run:
     desc: Run the built binary
