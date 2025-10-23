@@ -228,10 +228,9 @@ func (s *FeedFetcherService) fetchSingleFeed(feed database.PublicFeedsSelect) {
 	})
 	if err != nil {
 		s.handleRequestError(jobCtx, HandleRequestErrorParams{
-			FeedID:     feed.Id,
-			Err:        err,
-			Operation:  "HTTP request",
-			RetryCount: feed.RetryCount,
+			Feed:      feed,
+			Err:       err,
+			Operation: "HTTP request",
 		})
 		return
 	}
@@ -253,10 +252,9 @@ func (s *FeedFetcherService) fetchSingleFeed(feed database.PublicFeedsSelect) {
 
 // HandleRequestErrorParams contains parameters for handling HTTP request errors
 type HandleRequestErrorParams struct {
-	FeedID     string
-	Err        error
-	Operation  string
-	RetryCount int
+	Feed      database.PublicFeedsSelect
+	Err       error
+	Operation string
 }
 
 // handleRequestError handles HTTP request errors, distinguishing between permanent (SSRF) and temporary errors
@@ -264,23 +262,19 @@ func (s *FeedFetcherService) handleRequestError(ctx context.Context, params Hand
 	// Check if error is SSRF validation failure
 	if strings.Contains(params.Err.Error(), "security validation failed") {
 		// SSRF errors are permanent - URL is malicious/blocked
-		s.logger.Error(params.Operation+" failed (SSRF)", "feed_id", params.FeedID, "error", params.Err)
+		s.logger.Error(params.Operation+" failed (SSRF)", "feed_id", params.Feed.Id, "error", params.Err)
 		errorMsg := params.Err.Error()
 		_ = s.updateFeedStatus(ctx, UpdateFeedStatusParams{
-			FeedID:   params.FeedID,
+			FeedID:   params.Feed.Id,
 			Status:   "permanent_error",
 			ErrorMsg: &errorMsg,
 		})
 	} else {
 		// Other errors are temporary - network issues, timeouts, etc.
-		s.logger.Error(params.Operation+" failed", "feed_id", params.FeedID, "error", params.Err)
-		errorMsg := fmt.Sprintf("%s failed: %v", params.Operation, params.Err)
-		nextFetch := calculateBackoff(params.RetryCount, time.Now())
-		_ = s.updateFeedStatus(ctx, UpdateFeedStatusParams{
-			FeedID:     params.FeedID,
-			Status:     "temporary_error",
-			ErrorMsg:   &errorMsg,
-			FetchAfter: &nextFetch,
+		s.handleTemporaryFailure(ctx, HandleTemporaryFailureParams{
+			Feed: params.Feed,
+			Err:  params.Err.Error(),
+			Resp: nil,
 		})
 	}
 }
@@ -334,6 +328,7 @@ type UpdateFeedStatusParams struct {
 	Etag         *string
 	LastModified *string
 	NewURL       *string
+	RetryCount   *int
 }
 
 // updateFeedStatus updates feed status in database after fetch attempt
@@ -354,8 +349,10 @@ func (s *FeedFetcherService) updateFeedStatus(ctx context.Context, params Update
 		LastFetchedAt:   &now,
 	}
 
-	// Reset retry count on success
-	if params.Status == "success" {
+	// Set retry count if provided, otherwise reset on success
+	if params.RetryCount != nil {
+		update.RetryCount = params.RetryCount
+	} else if params.Status == "success" {
 		retryCount := 0
 		update.RetryCount = &retryCount
 	}
@@ -486,17 +483,13 @@ func (s *FeedFetcherService) handleHTTPResponse(ctx context.Context, params Hand
 		s.handleClientError(ctx, params.Feed, statusCode)
 
 	case statusCode >= 500: // 5xx
-		s.handleServerError(ctx, params.Feed, statusCode)
+		s.handleServerError(ctx, params.Feed, params.Resp)
 
 	default:
-		s.logger.Warn("Unexpected HTTP status", "feed_id", params.Feed.Id, "status", statusCode)
-		errorMsg := fmt.Sprintf("Unexpected HTTP status: %d", statusCode)
-		nextFetch := calculateBackoff(params.Feed.RetryCount, time.Now())
-		_ = s.updateFeedStatus(ctx, UpdateFeedStatusParams{
-			FeedID:     params.Feed.Id,
-			Status:     "temporary_error",
-			ErrorMsg:   &errorMsg,
-			FetchAfter: &nextFetch,
+		s.handleTemporaryFailure(ctx, HandleTemporaryFailureParams{
+			Feed: params.Feed,
+			Err:  fmt.Sprintf("Unexpected HTTP status: %d", statusCode),
+			Resp: params.Resp, // Pass the response to check for Retry-After
 		})
 	}
 }
@@ -544,13 +537,9 @@ func (s *FeedFetcherService) handleSuccess(ctx context.Context, feed database.Pu
 	// Save articles to database
 	if err := s.saveNewArticles(ctx, feed.Id, articles); err != nil {
 		s.logger.Error("Failed to save articles", "feed_id", feed.Id, "error", err)
-		errorMsg := fmt.Sprintf("Failed to save articles: %v", err)
-		nextFetch := calculateBackoff(feed.RetryCount, time.Now())
-		_ = s.updateFeedStatus(ctx, UpdateFeedStatusParams{
-			FeedID:     feed.Id,
-			Status:     "temporary_error",
-			ErrorMsg:   &errorMsg,
-			FetchAfter: &nextFetch,
+		s.handleTemporaryFailure(ctx, HandleTemporaryFailureParams{
+			Feed: feed,
+			Err:  "Failed to save new articles: An internal database error occurred.",
 		})
 		return
 	}
@@ -616,13 +605,9 @@ func (s *FeedFetcherService) handleRedirect(ctx context.Context, params HandleRe
 	if newLocation == "" {
 		s.logger.Error("Redirect without Location header", "feed_id", params.Feed.Id, "permanent", params.IsPermanent)
 		errorMsg := "Redirect without Location header"
-		statusType := "temporary_error"
-		if params.IsPermanent {
-			statusType = "permanent_error"
-		}
 		_ = s.updateFeedStatus(ctx, UpdateFeedStatusParams{
 			FeedID:   params.Feed.Id,
-			Status:   statusType,
+			Status:   "permanent_error",
 			ErrorMsg: &errorMsg,
 		})
 		return
@@ -635,7 +620,7 @@ func (s *FeedFetcherService) handleRedirect(ctx context.Context, params HandleRe
 		errorMsg := fmt.Sprintf("Invalid redirect URL: %v", err)
 		_ = s.updateFeedStatus(ctx, UpdateFeedStatusParams{
 			FeedID:   params.Feed.Id,
-			Status:   "temporary_error",
+			Status:   "permanent_error",
 			ErrorMsg: &errorMsg,
 		})
 		return
@@ -690,10 +675,9 @@ func (s *FeedFetcherService) handleRedirect(ctx context.Context, params HandleRe
 	})
 	if err != nil {
 		s.handleRequestError(ctx, HandleRequestErrorParams{
-			FeedID:     params.Feed.Id,
-			Err:        err,
-			Operation:  "Redirect request",
-			RetryCount: params.Feed.RetryCount,
+			Feed:      params.Feed,
+			Err:       err,
+			Operation: "Redirect request",
 		})
 		return
 	}
@@ -767,15 +751,43 @@ func (s *FeedFetcherService) handleClientError(ctx context.Context, feed databas
 }
 
 // handleServerError processes 5xx server errors
-func (s *FeedFetcherService) handleServerError(ctx context.Context, feed database.PublicFeedsSelect, statusCode int) {
-	s.logger.Warn("Server error", "feed_id", feed.Id, "status", statusCode)
+func (s *FeedFetcherService) handleServerError(ctx context.Context, feed database.PublicFeedsSelect, resp *http.Response) {
+	s.handleTemporaryFailure(ctx, HandleTemporaryFailureParams{
+		Feed: feed,
+		Err:  fmt.Sprintf("Server error (HTTP %d)", resp.StatusCode),
+		Resp: resp,
+	})
+}
 
-	errorMsg := fmt.Sprintf("Server error (HTTP %d)", statusCode)
-	nextFetch := calculateBackoff(feed.RetryCount, time.Now())
+// HandleTemporaryFailureParams contains parameters for handleTemporaryFailure
+type HandleTemporaryFailureParams struct {
+	Feed database.PublicFeedsSelect
+	Err  string
+	Resp *http.Response
+}
+
+// handleTemporaryFailure encapsulates logic for handling temporary errors, including retry count and permanent error threshold.
+func (s *FeedFetcherService) handleTemporaryFailure(ctx context.Context, params HandleTemporaryFailureParams) {
+	newRetryCount := params.Feed.RetryCount + 1
+	status := "temporary_error"
+	if newRetryCount >= 10 {
+		status = "permanent_error"
+		s.logger.Warn("Feed reached max retry count, marking as permanent_error", "feed_id", params.Feed.Id, "retry_count", newRetryCount)
+	}
+
+	var nextFetch time.Time
+	if params.Resp != nil {
+		retryAfter := params.Resp.Header.Get(HeaderRetryAfter)
+		nextFetch = parseRetryAfter(retryAfter, newRetryCount, time.Now())
+	} else {
+		nextFetch = calculateBackoff(newRetryCount, time.Now())
+	}
+
 	_ = s.updateFeedStatus(ctx, UpdateFeedStatusParams{
-		FeedID:     feed.Id,
-		Status:     "temporary_error",
-		ErrorMsg:   &errorMsg,
+		FeedID:     params.Feed.Id,
+		Status:     status,
+		ErrorMsg:   &params.Err,
 		FetchAfter: &nextFetch,
+		RetryCount: &newRetryCount,
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
@@ -127,6 +128,9 @@ func (h *Handler) CreateFeed(c echo.Context) error {
 		return c.Render(http.StatusBadRequest, "", view.FeedForm(vm))
 	}
 
+	// Sanitize URL input
+	cmd.URL = strings.TrimSpace(cmd.URL)
+
 	// Validate command
 	if err := c.Validate(cmd); err != nil {
 		h.logger.Warn("validation failed", "error", err)
@@ -238,6 +242,9 @@ func (h *Handler) HandleUpdate(c echo.Context) error {
 		vm := models.NewFeedFormWithErrors("edit", feedID, "", "", errorVM)
 		return c.Render(http.StatusBadRequest, "", view.FeedForm(vm))
 	}
+
+	// Sanitize URL input
+	cmd.URL = strings.TrimSpace(cmd.URL)
 
 	// Validate command
 	if err := c.Validate(cmd); err != nil {
