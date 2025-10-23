@@ -42,6 +42,10 @@
   "lint-staged": {
     "*.go": "goimports -w",
     "*.templ": "templ fmt",
-    "*.{js,ts,json,css,yml,yaml,md}": "prettier --write"
+    "*.{js,ts,json,css,md}": "prettier --write",
+    "*.{yml,yaml}": [
+      "prettier --write",
+      "yamllint"
+    ]
   }
 }

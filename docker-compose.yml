@@ -1,0 +1,20 @@
+services:
+  vibefeeder:
+    image: ghcr.io/tjanas94/vibefeeder:latest
+    container_name: vibefeeder
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
+    network_mode: host
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

@@ -29,7 +29,8 @@ AI - Komunikacja z modelami przez usługę Openrouter.ai:
 CI/CD i Hosting:
 
 - Github Actions do tworzenia pipeline'ów CI/CD
-- Hetzner Cloud do hostowania aplikacji za pośrednictwem obrazu docker
+- Fly.io jako platforma hostingowa z globalnym zasięgiem i prostą konfiguracją dla aplikacji Dockerowych
+- Cloudflare jako reverse proxy z CDN i ochroną DDoS
 
 Testowanie:
 
@@ -42,4 +43,4 @@ Testy E2E (End-to-End):
 
 - Playwright jako framework do automatyzacji przeglądarki i testowania interakcji htmx
 - Doskonałe wsparcie dla dynamicznych treści i oczekiwania na żądania sieciowe
-- Testy uruchamiane na najnowszych wersjach Chrome i Firefox
+- Testy uruchamiane na najnowszych wersjach Chrome

@@ -1,0 +1,26 @@
+name: Setup Build Environment
+description: Common setup steps for build, lint, and test jobs
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v5
+
+    - uses: actions/setup-go@v6
+      with:
+        go-version-file: .go-version
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version-file: .node-version
+        cache: npm
+
+    - uses: go-task/setup-task@v1
+
+    - name: Install dependencies
+      shell: bash
+      run: task install-deps:ci
+
+    - name: Generate templ code
+      shell: bash
+      run: task build:templ

@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  workflow_call:
+    inputs:
+      run_e2e:
+        description: Whether to run E2E tests
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      SUPABASE_URL:
+        required: false
+      SUPABASE_KEY:
+        required: false
+      OPENROUTER_API_KEY:
+        required: false
+      E2E_USERNAME_ID:
+        required: false
+      E2E_USERNAME:
+        required: false
+      E2E_PASSWORD:
+        required: false
+      E2E_GITHUB_ACCESS_TOKEN:
+        required: false
+    outputs:
+      lint-result:
+        description: Result of the lint job
+        value: ${{ jobs.lint.result }}
+      test-unit-result:
+        description: Result of the unit tests job
+        value: ${{ jobs.test-unit.result }}
+      test-e2e-result:
+        description: Result of the E2E tests job
+        value: ${{ jobs.test-e2e.result }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/setup
+
+      - name: Lint Go
+        uses: golangci/golangci-lint-action@v8
+
+      - name: Lint ESLint
+        run: task lint:eslint
+        if: success() || failure()
+
+      - name: Lint Prettier
+        run: task lint:prettier
+        if: success() || failure()
+
+      - name: Lint TypeScript
+        run: task lint:typescript
+        if: success() || failure()
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: ./.github/actions/setup
+
+      - name: Run unit tests
+        run: task test:unit
+
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: coverage-unit
+          path: coverage.out
+          retention-days: 1
+
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    environment: integration
+    needs: lint
+    if: ${{ inputs.run_e2e }}
+    steps:
+      - uses: ./.github/actions/setup
+
+      - name: Install Playwright browsers
+        run: node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: task test:e2e
+        env:
+          CI: "true"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          E2E_USERNAME_ID: ${{ secrets.E2E_USERNAME_ID }}
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          E2E_GITHUB_ACCESS_TOKEN: ${{ secrets.E2E_GITHUB_ACCESS_TOKEN }}
+
+      - name: Upload E2E test report
+        uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

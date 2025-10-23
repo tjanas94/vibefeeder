@@ -214,3 +214,17 @@ tasks:
   test:e2e:report:
     desc: Show Playwright test report
     cmd: node_modules/.bin/playwright show-report
+
+  docker:build:
+    desc: Build Docker image with git SHA tag
+    deps:
+      - build
+    cmds:
+      - |
+        GIT_SHA=$(git rev-parse --short HEAD)
+        docker build \
+          --build-arg GIT_SHA=${GIT_SHA} \
+          --tag ghcr.io/tjanas94/vibefeeder:${GIT_SHA} \
+          --tag ghcr.io/tjanas94/vibefeeder:latest \
+          .
+        echo "Built image: ghcr.io/tjanas94/vibefeeder:${GIT_SHA}"

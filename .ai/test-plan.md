@@ -256,7 +256,7 @@ Testy obejmą następujące moduły i funkcjonalności:
   - Mock serwer HTTP (`net/http/httptest`) do symulowania odpowiedzi z OpenRouter API.
   - Opcjonalnie: `toxiproxy` do symulacji problemów sieciowych.
 - **Środowisko Uruchomieniowe:** Testy będą uruchamiane w środowisku CI/CD (GitHub Actions) na systemie Linux.
-- **Przeglądarki (dla E2E):** Testy E2E będą przeprowadzane na najnowszych wersjach Chrome i Firefox.
+- **Przeglądarki (dla E2E):** Testy E2E będą przeprowadzane na najnowszych wersjach Chrome.
 - **Narzędzia Wydajnościowe:** `k6` lub `vegeta` uruchamiane w izolowanym środowisku z kontrolowanymi zasobami.
 
 ## 6. Narzędzia do Testowania
