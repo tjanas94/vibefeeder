@@ -169,44 +169,44 @@ func TestCalculateBackoff(t *testing.T) {
 		{
 			name:         "first retry",
 			retryCount:   0,
-			wantDuration: 5 * time.Minute,
-			description:  "First retry should wait 5 minutes",
+			wantDuration: 15 * time.Minute,
+			description:  "First retry should wait 15 minutes",
 		},
 		{
 			name:         "second retry",
 			retryCount:   1,
-			wantDuration: 10 * time.Minute,
-			description:  "Second retry should wait 10 minutes",
+			wantDuration: 30 * time.Minute,
+			description:  "Second retry should wait 30 minutes",
 		},
 		{
 			name:         "third retry",
 			retryCount:   2,
-			wantDuration: 20 * time.Minute,
-			description:  "Third retry should wait 20 minutes",
+			wantDuration: 60 * time.Minute,
+			description:  "Third retry should wait 60 minutes",
 		},
 		{
 			name:         "fourth retry",
 			retryCount:   3,
-			wantDuration: 40 * time.Minute,
-			description:  "Fourth retry should wait 40 minutes",
+			wantDuration: 120 * time.Minute,
+			description:  "Fourth retry should wait 120 minutes",
 		},
 		{
 			name:         "fifth retry",
 			retryCount:   4,
-			wantDuration: 80 * time.Minute,
-			description:  "Fifth retry should wait 80 minutes",
+			wantDuration: 240 * time.Minute,
+			description:  "Fifth retry should wait 240 minutes",
 		},
 		{
-			name:         "sixth retry caps at 2 hours",
+			name:         "sixth retry caps at 6 hours",
 			retryCount:   5,
-			wantDuration: 120 * time.Minute,
-			description:  "Sixth retry should cap at 120 minutes",
+			wantDuration: 360 * time.Minute,
+			description:  "Sixth retry should cap at 360 minutes",
 		},
 		{
-			name:         "many retries still cap at 2 hours",
+			name:         "many retries still cap at 6 hours",
 			retryCount:   10,
-			wantDuration: 120 * time.Minute,
-			description:  "High retry counts should still cap at 120 minutes",
+			wantDuration: 360 * time.Minute,
+			description:  "High retry counts should still cap at 360 minutes",
 		},
 	}
 
@@ -441,14 +441,14 @@ func TestParseRetryAfter(t *testing.T) {
 			name:        "empty retry after uses backoff",
 			retryAfter:  "",
 			retryCount:  2,
-			wantTime:    now.Add(20 * time.Minute), // retryCount 2 = 20 min backoff
+			wantTime:    now.Add(60 * time.Minute), // retryCount 2 = 60 min backoff
 			description: "Should fallback to exponential backoff when empty",
 		},
 		{
 			name:        "invalid retry after uses backoff",
 			retryAfter:  "invalid-value",
 			retryCount:  1,
-			wantTime:    now.Add(10 * time.Minute), // retryCount 1 = 10 min backoff
+			wantTime:    now.Add(30 * time.Minute), // retryCount 1 = 30 min backoff
 			description: "Should fallback to exponential backoff when invalid",
 		},
 		{
@@ -476,7 +476,7 @@ func TestParseRetryAfter(t *testing.T) {
 			name:        "malformed http date uses backoff",
 			retryAfter:  "Mon, 15 Jan 2024 99:99:99 GMT",
 			retryCount:  0,
-			wantTime:    now.Add(5 * time.Minute),
+			wantTime:    now.Add(15 * time.Minute),
 			description: "Should fallback to backoff for malformed dates",
 		},
 	}

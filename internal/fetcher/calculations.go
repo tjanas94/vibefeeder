@@ -48,10 +48,10 @@ func parseCacheControlMaxAge(cacheControl string) (time.Duration, bool) {
 
 // calculateBackoff calculates exponential backoff for retry attempts
 func calculateBackoff(retryCount int, now time.Time) time.Time {
-	// Exponential backoff: 5min, 10min, 20min, 40min, 80min, max 2 hours
-	backoffMinutes := 5 * (1 << min(retryCount, 5))
-	if backoffMinutes > 120 {
-		backoffMinutes = 120
+	// Exponential backoff: 15min, 30min, 60min, 120min, 240min, max 6 hours
+	backoffMinutes := 15 * (1 << min(retryCount, 5))
+	if backoffMinutes > 360 { // 6 hours
+		backoffMinutes = 360
 	}
 
 	return now.Add(time.Duration(backoffMinutes) * time.Minute)
