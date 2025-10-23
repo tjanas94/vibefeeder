@@ -42,6 +42,8 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+
       - uses: ./.github/actions/setup
 
       - name: Lint Go
@@ -64,6 +66,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
+      - uses: actions/checkout@v5
+
       - uses: ./.github/actions/setup
 
       - name: Run unit tests
@@ -84,6 +88,8 @@ jobs:
     needs: lint
     if: ${{ inputs.run_e2e }}
     steps:
+      - uses: actions/checkout@v5
+
       - uses: ./.github/actions/setup
 
       - name: Install Playwright browsers
