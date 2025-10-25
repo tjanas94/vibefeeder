@@ -208,7 +208,7 @@ func TestParseFieldErrors_HTTPErrorVariousStatusCodes(t *testing.T) {
 // TestParseFieldErrors_HTTPErrorWithOtherMapTypes tests HTTPError with map but wrong value type
 func TestParseFieldErrors_HTTPErrorWithOtherMapTypes(t *testing.T) {
 	// Create an HTTPError with a map that has non-string values
-	mapWithWrongType := map[string]interface{}{
+	mapWithWrongType := map[string]any{
 		"field1": "valid string",
 		"field2": 123, // not a string
 	}
@@ -216,13 +216,13 @@ func TestParseFieldErrors_HTTPErrorWithOtherMapTypes(t *testing.T) {
 
 	result := ParseFieldErrors(httpErr)
 
-	// This should return nil because the map type is map[string]interface{}, not map[string]string
+	// This should return nil because the map type is map[string]any, not map[string]string
 	assert.Nil(t, result)
 }
 
 // TestParseFieldErrors_HTTPErrorWithNestedMapMessage tests HTTPError with nested map (should fail type assertion)
 func TestParseFieldErrors_HTTPErrorWithNestedMapMessage(t *testing.T) {
-	nestedMap := map[string]interface{}{
+	nestedMap := map[string]any{
 		"errors": map[string]string{
 			"email": "invalid",
 		},

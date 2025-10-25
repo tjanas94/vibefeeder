@@ -2,7 +2,6 @@ package summary
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -54,10 +53,10 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 	articles, err := s.repo.FetchRecentArticles(ctx, userID, maxArticlesForSummary)
 	if err != nil {
 		s.logger.Error("failed to fetch articles", "user_id", userID, "error", err)
-		return nil, fmt.Errorf("failed to fetch articles: %w", err)
+		return nil, NewDatabaseError(err)
 	}
 	if len(articles) == 0 {
-		return nil, ErrNoArticlesFound
+		return nil, NewNoArticlesFoundError()
 	}
 
 	// Step 2: Prepare prompt from articles
@@ -79,21 +78,21 @@ func (s *Service) GenerateSummary(ctx context.Context, userID string) (*models.S
 	response, err := s.aiClient.GenerateChatCompletion(aiCtx, options)
 	if err != nil {
 		s.logger.Error("AI service failed to generate summary", "user_id", userID, "error", err)
-		return nil, ErrAIServiceUnavailable
+		return nil, NewAIServiceUnavailableError()
 	}
 
 	// Extract summary content from response
 	summaryContent, err := extractSummaryContent(response)
 	if err != nil {
 		s.logger.Error("AI service returned empty response", "user_id", userID, "error", err)
-		return nil, ErrAIServiceUnavailable
+		return nil, NewAIServiceUnavailableError()
 	}
 
 	// Step 4: Save summary to database
 	dbSummary, err := s.repo.SaveSummary(ctx, userID, summaryContent)
 	if err != nil {
 		s.logger.Error("failed to save summary to database", "user_id", userID, "error", err)
-		return nil, ErrDatabase
+		return nil, NewDatabaseError(err)
 	}
 
 	// Log summary_generated event
@@ -115,13 +114,15 @@ func (s *Service) GetLatestSummaryForUser(ctx context.Context, userID string) (*
 	// Step 1: Fetch the latest summary for the user
 	summary, err := s.repo.GetLatestSummary(ctx, userID)
 	if err != nil {
-		return nil, err
+		s.logger.Error("failed to get latest summary", "user_id", userID, "error", err)
+		return nil, NewDatabaseError(err)
 	}
 
 	// Step 2: Check if user has at least one feed
 	canGenerate, err := s.repo.HasFeeds(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check user feeds: %w", err)
+		s.logger.Error("failed to check user feeds", "user_id", userID, "error", err)
+		return nil, NewDatabaseError(err)
 	}
 
 	// Step 3: Build the view model

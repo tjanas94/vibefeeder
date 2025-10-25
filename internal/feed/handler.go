@@ -1,9 +1,8 @@
 package feed
 
 import (
-	"context"
+	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -11,7 +10,7 @@ import (
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
 	"github.com/tjanas94/vibefeeder/internal/feed/view"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
-	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	sharederrors "github.com/tjanas94/vibefeeder/internal/shared/errors"
 	sharedmodels "github.com/tjanas94/vibefeeder/internal/shared/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/validator"
 	sharedview "github.com/tjanas94/vibefeeder/internal/shared/view/components"
@@ -25,23 +24,15 @@ type FeedFetcher interface {
 // Handler handles HTTP requests for feed operations
 type Handler struct {
 	service     *Service
-	logger      *slog.Logger
 	feedFetcher FeedFetcher
 }
 
 // NewHandler creates a new feed handler
-func NewHandler(service *Service, logger *slog.Logger, feedFetcher FeedFetcher) *Handler {
+func NewHandler(service *Service, feedFetcher FeedFetcher) *Handler {
 	return &Handler{
 		service:     service,
-		logger:      logger,
 		feedFetcher: feedFetcher,
 	}
-}
-
-// contextWithToken adds the access token from Echo context to request context for RLS
-func (h *Handler) contextWithToken(c echo.Context) context.Context {
-	token := auth.GetAccessToken(c)
-	return database.ContextWithToken(c.Request().Context(), token)
 }
 
 // ListFeeds handles GET /feeds endpoint
@@ -50,39 +41,33 @@ func (h *Handler) ListFeeds(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
-	// Add access token to context for RLS
-	ctx := h.contextWithToken(c)
-
-	// Bind and validate query parameters
+	// Bind and sanitize query parameters
 	query := new(models.ListFeedsQuery)
-	if err := c.Bind(query); err != nil {
-		h.logger.Warn("failed to bind query parameters", "error", err)
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid query parameters")
-	}
+	_ = c.Bind(query) // Ignore bind errors for query parameters
 
-	// Set defaults for optional parameters
+	// Sanitize and set defaults for invalid/missing values
 	query.SetDefaults()
-
-	// Validate query parameters
-	if err := c.Validate(query); err != nil {
-		h.logger.Warn("invalid query parameters", "error", err)
-		return err // Echo validator returns formatted error
-	}
 
 	// Set user ID from authenticated session
 	query.UserID = userID
 
 	// Call service to get feeds
-	vm, err := h.service.ListFeeds(ctx, *query)
+	vm, err := h.service.ListFeeds(c.Request().Context(), *query)
 	if err != nil {
-		h.logger.Error("failed to list feeds", "user_id", userID, "error", err)
-		// Return empty state with error message instead of HTTP error
-		vm = &models.FeedListViewModel{
-			Feeds:          []models.FeedItemViewModel{},
-			ShowEmptyState: true,
-			ErrorMessage:   "Failed to load feed list. Please refresh the page.",
-			Pagination:     sharedmodels.PaginationViewModel{},
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			errVM := &models.FeedListViewModel{
+				Feeds:          []models.FeedItemViewModel{},
+				ShowEmptyState: true,
+				ErrorMessage:   serviceErr.Message,
+				Pagination:     sharedmodels.PaginationViewModel{},
+			}
+			return c.Render(serviceErr.Code, "", view.List(*errVM))
 		}
+
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// Build URL for HX-Push-Url header to update browser history
@@ -111,101 +96,69 @@ func (h *Handler) HandleFeedAddForm(c echo.Context) error {
 // CreateFeed handles POST /feeds endpoint
 // Creates a new feed for the authenticated user
 func (h *Handler) CreateFeed(c echo.Context) error {
-	// Get user ID from authenticated session
-	userID := auth.GetUserID(c)
-
-	// Add access token to context for RLS
-	ctx := h.contextWithToken(c)
-
-	// Bind form data to command
 	cmd := new(models.CreateFeedCommand)
+	// Path 1: Handle bind errors (invalid request format)
 	if err := c.Bind(cmd); err != nil {
-		h.logger.Warn("failed to bind form data", "error", err)
-		errorVM := models.FeedFormErrorViewModel{
-			GeneralError: "Invalid form data",
-		}
-		vm := models.NewFeedFormWithErrors("add", "", "", "", errorVM)
-		return c.Render(http.StatusBadRequest, "", view.FeedForm(vm))
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid form data")
 	}
 
 	// Sanitize URL input
 	cmd.URL = strings.TrimSpace(cmd.URL)
 
-	// Validate command
+	// Get user ID from authenticated session
+	cmd.UserID = auth.GetUserID(c)
+
+	// Path 2: Handle validation errors (invalid data)
 	if err := c.Validate(cmd); err != nil {
-		h.logger.Warn("validation failed", "error", err)
 		// Parse validation errors into view model
 		fieldErrors := validator.ParseFieldErrors(err)
 		errorVM := models.NewFeedFormErrorFromFieldErrors(fieldErrors)
 		vm := models.NewFeedFormWithErrors("add", "", cmd.Name, cmd.URL, errorVM)
-		return c.Render(http.StatusBadRequest, "", view.FeedForm(vm))
+		return c.Render(http.StatusUnprocessableEntity, "", view.FeedForm(vm))
 	}
 
 	// Call service to create feed
-	feedID, err := h.service.CreateFeed(ctx, *cmd, userID)
+	feedID, err := h.service.CreateFeed(c.Request().Context(), *cmd)
 	if err != nil {
-		// Handle specific error types
-		if err == ErrFeedAlreadyExists {
-			h.logger.Info("duplicate feed attempt", "user_id", userID, "url", cmd.URL)
-			errorVM := models.FeedFormErrorViewModel{
-				URLError: "You have already added this feed",
-			}
-			vm := models.NewFeedFormWithErrors("add", "", cmd.Name, cmd.URL, errorVM)
-			return c.Render(http.StatusConflict, "", view.FeedForm(vm))
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			return h.renderFormServiceError(c, serviceErr, "add", "", cmd.Name, cmd.URL)
 		}
 
-		// Handle other errors
-		h.logger.Error("failed to create feed", "user_id", userID, "error", err)
-		errorVM := models.FeedFormErrorViewModel{
-			GeneralError: "Failed to create feed. Please try again.",
-		}
-		vm := models.NewFeedFormWithErrors("add", "", cmd.Name, cmd.URL, errorVM)
-		return c.Render(http.StatusInternalServerError, "", view.FeedForm(vm))
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// Trigger immediate fetch for the newly created feed
 	if h.feedFetcher != nil {
 		h.feedFetcher.FetchFeedNow(feedID)
-		h.logger.Info("Triggered immediate fetch for new feed", "feed_id", feedID)
 	}
 
 	// Success - refresh feed list, close modal and show toast
-	c.Response().Header().Set("HX-Reswap", "none")
-	c.Response().Header().Set("HX-Trigger", `{"refreshFeedList": null, "closeModal": null}`)
-	return c.Render(http.StatusOK, "", sharedview.Toast(sharedview.ToastProps{
-		Type:    "success",
-		Message: "Feed was added",
-		UseOOB:  true,
-	}))
+	return h.renderSuccessToast(c, "Feed was added")
 }
 
 // HandleFeedEditForm handles GET /feeds/:id/edit endpoint
 // Returns an HTML form pre-filled with the feed's current data for editing
 func (h *Handler) HandleFeedEditForm(c echo.Context) error {
-	// Get user ID from authenticated session (check auth first)
+	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
-	// Add access token to context for RLS
-	ctx := h.contextWithToken(c)
-
-	// Get and validate feed ID from path parameter
-	feedID, err := h.getFeedID(c)
-	if err != nil {
-		return err // Already returns echo.NewHTTPError
-	}
+	// Get feed ID from path parameter
+	feedID := c.Param("id")
 
 	// Call service to get feed for editing
-	vm, err := h.service.GetFeedForEdit(ctx, feedID, userID)
+	vm, err := h.service.GetFeedForEdit(c.Request().Context(), feedID, userID)
 	if err != nil {
-		// Handle specific error types
-		if err == ErrFeedNotFound {
-			h.logger.Info("feed not found or unauthorized", "feed_id", feedID, "user_id", userID)
-			return echo.NewHTTPError(http.StatusNotFound, "Feed not found")
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			return h.renderErrorToast(c, serviceErr.Code, serviceErr.Message)
 		}
 
-		// Handle other errors
-		h.logger.Error("failed to get feed for edit", "feed_id", feedID, "user_id", userID, "error", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to load feed")
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// Success - add HX-Trigger header to open modal and render form with view model
@@ -216,91 +169,53 @@ func (h *Handler) HandleFeedEditForm(c echo.Context) error {
 // HandleUpdate handles PATCH /feeds/:id endpoint
 // Updates an existing feed for the authenticated user
 func (h *Handler) HandleUpdate(c echo.Context) error {
-	// Get user ID from authenticated session
-	userID := auth.GetUserID(c)
-
-	// Add access token to context for RLS
-	ctx := h.contextWithToken(c)
-
-	// Get and validate feed ID from path parameter
-	feedID, err := h.getFeedID(c)
-	if err != nil {
-		errorVM := models.FeedFormErrorViewModel{
-			GeneralError: "Invalid feed ID",
-		}
-		vm := models.NewFeedFormWithErrors("edit", "", "", "", errorVM)
-		return c.Render(http.StatusBadRequest, "", view.FeedForm(vm))
-	}
-
-	// Bind form data to command
 	cmd := new(models.UpdateFeedCommand)
+	// Path 1: Handle bind errors (invalid request format)
 	if err := c.Bind(cmd); err != nil {
-		h.logger.Warn("failed to bind form data", "feed_id", feedID, "error", err)
-		errorVM := models.FeedFormErrorViewModel{
-			GeneralError: "Invalid form data",
-		}
-		vm := models.NewFeedFormWithErrors("edit", feedID, "", "", errorVM)
-		return c.Render(http.StatusBadRequest, "", view.FeedForm(vm))
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid form data")
 	}
 
 	// Sanitize URL input
 	cmd.URL = strings.TrimSpace(cmd.URL)
 
-	// Validate command
+	// Get user ID from authenticated session
+	cmd.UserID = auth.GetUserID(c)
+
+	// Path 2: Handle validation errors (invalid data)
 	if err := c.Validate(cmd); err != nil {
-		h.logger.Warn("validation failed", "feed_id", feedID, "error", err)
 		// Parse validation errors into view model
 		fieldErrors := validator.ParseFieldErrors(err)
 		errorVM := models.NewFeedFormErrorFromFieldErrors(fieldErrors)
-		vm := models.NewFeedFormWithErrors("edit", feedID, cmd.Name, cmd.URL, errorVM)
-		return c.Render(http.StatusBadRequest, "", view.FeedForm(vm))
+		vm := models.NewFeedFormWithErrors("edit", cmd.ID, cmd.Name, cmd.URL, errorVM)
+		return c.Render(http.StatusUnprocessableEntity, "", view.FeedForm(vm))
 	}
 
 	// Call service to update feed
-	urlChanged, err := h.service.UpdateFeed(ctx, feedID, userID, *cmd)
+	urlChanged, err := h.service.UpdateFeed(c.Request().Context(), *cmd)
 	if err != nil {
-		// Handle specific error types
-		if err == ErrFeedNotFound {
-			h.logger.Info("feed not found or unauthorized", "feed_id", feedID, "user_id", userID)
-			errorVM := models.FeedFormErrorViewModel{
-				GeneralError: "Feed not found",
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			// For 404 errors, show error toast, close modal and refresh feed list
+			if serviceErr.Code == http.StatusNotFound {
+				return h.renderErrorToast(c, serviceErr.Code, serviceErr.Message)
 			}
-			vm := models.NewFeedFormWithErrors("edit", feedID, cmd.Name, cmd.URL, errorVM)
-			return c.Render(http.StatusNotFound, "", view.FeedForm(vm))
+
+			// For other errors, show form with errors
+			return h.renderFormServiceError(c, serviceErr, "edit", cmd.ID, cmd.Name, cmd.URL)
 		}
 
-		if err == ErrFeedURLConflict {
-			h.logger.Info("url already in use", "feed_id", feedID, "user_id", userID, "url", cmd.URL)
-			errorVM := models.FeedFormErrorViewModel{
-				URLError: "You have already added this feed",
-			}
-			vm := models.NewFeedFormWithErrors("edit", feedID, cmd.Name, cmd.URL, errorVM)
-			return c.Render(http.StatusConflict, "", view.FeedForm(vm))
-		}
-
-		// Handle other errors
-		h.logger.Error("failed to update feed", "feed_id", feedID, "user_id", userID, "error", err)
-		errorVM := models.FeedFormErrorViewModel{
-			GeneralError: "Failed to update feed. Please try again.",
-		}
-		vm := models.NewFeedFormWithErrors("edit", feedID, cmd.Name, cmd.URL, errorVM)
-		return c.Render(http.StatusInternalServerError, "", view.FeedForm(vm))
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// Trigger immediate fetch if URL changed
 	if urlChanged && h.feedFetcher != nil {
-		h.feedFetcher.FetchFeedNow(feedID)
-		h.logger.Info("Triggered immediate fetch after URL change", "feed_id", feedID)
+		h.feedFetcher.FetchFeedNow(cmd.ID)
 	}
 
 	// Success - refresh feed list, close modal and show toast
-	c.Response().Header().Set("HX-Reswap", "none")
-	c.Response().Header().Set("HX-Trigger", `{"refreshFeedList": null, "closeModal": null}`)
-	return c.Render(http.StatusOK, "", sharedview.Toast(sharedview.ToastProps{
-		Type:    "success",
-		Message: "Feed was updated",
-		UseOOB:  true,
-	}))
+	return h.renderSuccessToast(c, "Feed was updated")
 }
 
 // HandleDeleteConfirmation handles GET /feeds/:id/delete endpoint
@@ -309,27 +224,20 @@ func (h *Handler) HandleDeleteConfirmation(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
-	// Add access token to context for RLS
-	ctx := h.contextWithToken(c)
-
-	// Get and validate feed ID from path parameter
-	feedID, err := h.getFeedID(c)
-	if err != nil {
-		return err // Already returns echo.NewHTTPError
-	}
+	// Get feed ID from path parameter
+	feedID := c.Param("id")
 
 	// Get feed name for confirmation (we need to check if feed exists and belongs to user)
-	feed, err := h.service.GetFeedForEdit(ctx, feedID, userID)
+	feed, err := h.service.GetFeedForEdit(c.Request().Context(), feedID, userID)
 	if err != nil {
-		// Handle specific error types
-		if err == ErrFeedNotFound {
-			h.logger.Info("feed not found or unauthorized", "feed_id", feedID, "user_id", userID)
-			return echo.NewHTTPError(http.StatusNotFound, "Feed not found")
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			return h.renderErrorToast(c, serviceErr.Code, serviceErr.Message)
 		}
 
-		// Handle other errors
-		h.logger.Error("failed to get feed for delete confirmation", "feed_id", feedID, "user_id", userID, "error", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to load feed")
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// Create view model
@@ -349,83 +257,59 @@ func (h *Handler) DeleteFeed(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
-	// Add access token to context for RLS
-	ctx := h.contextWithToken(c)
+	// Get feed ID from path parameter
+	feedID := c.Param("id")
 
-	// Get and validate feed ID from path parameter
-	feedID, err := h.getFeedID(c)
-	if err != nil {
-		// Get feed name for error display
-		feed, feedErr := h.service.GetFeedForEdit(ctx, feedID, userID)
-		if feedErr != nil {
-			// If can't get feed, just use generic message
-			vm := models.DeleteConfirmationViewModel{
-				FeedID:       feedID,
-				FeedName:     "",
-				ErrorMessage: "Invalid feed ID",
-			}
-			return c.Render(http.StatusBadRequest, "", view.DeleteConfirmation(vm))
-		}
-		vm := models.DeleteConfirmationViewModel{
-			FeedID:       feedID,
-			FeedName:     feed.Name,
-			ErrorMessage: "Invalid feed ID",
-		}
-		return c.Render(http.StatusBadRequest, "", view.DeleteConfirmation(vm))
-	}
-
-	// Call service to delete feed
-	if err := h.service.DeleteFeed(ctx, feedID, userID); err != nil {
-		// Get feed name for error display
-		feed, feedErr := h.service.GetFeedForEdit(ctx, feedID, userID)
-		if feedErr != nil {
-			// If can't get feed, use generic message
-			vm := models.DeleteConfirmationViewModel{
-				FeedID:       feedID,
-				FeedName:     "",
-				ErrorMessage: "Failed to delete feed",
-			}
-			return c.Render(http.StatusInternalServerError, "", view.DeleteConfirmation(vm))
+	if err := h.service.DeleteFeed(c.Request().Context(), feedID, userID); err != nil {
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			return h.renderErrorToast(c, serviceErr.Code, serviceErr.Message)
 		}
 
-		// Handle specific error types
-		var errorMessage string
-		var statusCode int
-		if err == ErrFeedNotFound {
-			h.logger.Info("feed not found or unauthorized", "feed_id", feedID, "user_id", userID)
-			errorMessage = "Feed not found"
-			statusCode = http.StatusNotFound
-		} else {
-			// Handle other errors
-			h.logger.Error("failed to delete feed", "feed_id", feedID, "user_id", userID, "error", err)
-			errorMessage = "Failed to delete feed"
-			statusCode = http.StatusInternalServerError
-		}
-
-		vm := models.DeleteConfirmationViewModel{
-			FeedID:       feedID,
-			FeedName:     feed.Name,
-			ErrorMessage: errorMessage,
-		}
-		return c.Render(statusCode, "", view.DeleteConfirmation(vm))
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// Success - refresh feed list, close modal and show toast
+	return h.renderSuccessToast(c, "Feed was deleted")
+}
+
+// renderErrorToast renders error toast with modal close and refresh headers
+func (h *Handler) renderErrorToast(c echo.Context, statusCode int, message string) error {
 	c.Response().Header().Set("HX-Reswap", "none")
-	c.Response().Header().Set("HX-Trigger", `{"refreshFeedList": null, "closeModal": null}`)
-	return c.Render(http.StatusOK, "", sharedview.Toast(sharedview.ToastProps{
-		Type:    "success",
-		Message: "Feed was deleted",
+	c.Response().Header().Set("HX-Trigger", `{"closeModal": null, "refreshFeedList": null}`)
+	return c.Render(statusCode, "", sharedview.Toast(sharedview.ToastProps{
+		Type:    "error",
+		Message: message,
 		UseOOB:  true,
 	}))
 }
 
-// getFeedID extracts and validates feed ID from path parameter
-func (h *Handler) getFeedID(c echo.Context) (string, error) {
-	feedID := c.Param("id")
-	if !validator.IsValidUUID(feedID) {
-		h.logger.Warn("invalid feed id format", "feed_id", feedID)
-		return "", echo.NewHTTPError(http.StatusBadRequest, "Invalid feed ID")
+// renderSuccessToast renders success toast with modal close and refresh headers
+func (h *Handler) renderSuccessToast(c echo.Context, message string) error {
+	c.Response().Header().Set("HX-Reswap", "none")
+	c.Response().Header().Set("HX-Trigger", `{"closeModal": null, "refreshFeedList": null}`)
+	return c.Render(http.StatusOK, "", sharedview.Toast(sharedview.ToastProps{
+		Type:    "success",
+		Message: message,
+		UseOOB:  true,
+	}))
+}
+
+// renderFormServiceError renders form with ServiceError details
+func (h *Handler) renderFormServiceError(
+	c echo.Context,
+	serviceErr *sharederrors.ServiceError,
+	mode string, // "add" or "edit"
+	feedID string,
+	name string,
+	url string,
+) error {
+	errorVM := models.FeedFormErrorViewModel{
+		GeneralError: serviceErr.Message,
+		URLError:     serviceErr.FieldErrors["URL"],
 	}
-	return feedID, nil
+	vm := models.NewFeedFormWithErrors(mode, feedID, name, url, errorVM)
+	return c.Render(serviceErr.Code, "", view.FeedForm(vm))
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tjanas94/vibefeeder/internal/feed/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	sharederrors "github.com/tjanas94/vibefeeder/internal/shared/errors"
 	"github.com/tjanas94/vibefeeder/internal/shared/events"
 )
 
@@ -41,8 +42,8 @@ func (m *MockFeedRepository) FindFeedByIDAndUser(ctx context.Context, feedID, us
 	return args.Get(0).(*database.PublicFeedsSelect), args.Error(1)
 }
 
-func (m *MockFeedRepository) IsURLTaken(ctx context.Context, userID, url, excludeFeedID string) (bool, error) {
-	args := m.Called(ctx, userID, url, excludeFeedID)
+func (m *MockFeedRepository) IsURLTaken(ctx context.Context, query models.CheckURLTakenQuery) (bool, error) {
+	args := m.Called(ctx, query)
 	return args.Bool(0), args.Error(1)
 }
 
@@ -110,7 +111,7 @@ func TestListFeeds_Success(t *testing.T) {
 
 	result, err := service.ListFeeds(ctx, query)
 
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Len(t, result.Feeds, 2)
 	assert.False(t, result.ShowEmptyState)
@@ -140,7 +141,7 @@ func TestListFeeds_Empty(t *testing.T) {
 
 	result, err := service.ListFeeds(ctx, query)
 
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Len(t, result.Feeds, 0)
 	assert.True(t, result.ShowEmptyState)
@@ -170,7 +171,7 @@ func TestListFeeds_WithSearchFilter(t *testing.T) {
 
 	result, err := service.ListFeeds(ctx, query)
 
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.False(t, result.ShowEmptyState) // Don't show empty state when filters are applied
 	mockRepo.AssertExpectations(t)
@@ -191,9 +192,13 @@ func TestListFeeds_RepositoryError(t *testing.T) {
 
 	result, err := service.ListFeeds(ctx, query)
 
+	// ListFeeds now returns error instead of error message in view model
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "failed to list feeds")
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 500, serviceErr.Code)
 	mockRepo.AssertExpectations(t)
 }
 
@@ -207,8 +212,9 @@ func TestCreateFeed_Success(t *testing.T) {
 	ctx := context.Background()
 	userID := "user-123"
 	cmd := models.CreateFeedCommand{
-		Name: "Tech News",
-		URL:  "https://example.com/feed",
+		UserID: userID,
+		Name:   "Tech News",
+		URL:    "https://example.com/feed",
 	}
 
 	mockRepo.On("InsertFeed", ctx, mock.MatchedBy(func(feed database.PublicFeedsInsert) bool {
@@ -219,7 +225,7 @@ func TestCreateFeed_Success(t *testing.T) {
 		return event.EventType == events.EventFeedAdded && event.UserId != nil && *event.UserId == userID
 	})).Return(nil)
 
-	feedID, err := service.CreateFeed(ctx, cmd, userID)
+	feedID, err := service.CreateFeed(ctx, cmd)
 
 	require.NoError(t, err)
 	assert.Equal(t, "feed-123", feedID)
@@ -236,19 +242,23 @@ func TestCreateFeed_URLAlreadyExists(t *testing.T) {
 	ctx := context.Background()
 	userID := "user-123"
 	cmd := models.CreateFeedCommand{
-		Name: "Tech News",
-		URL:  "https://example.com/feed",
+		UserID: userID,
+		Name:   "Tech News",
+		URL:    "https://example.com/feed",
 	}
 
 	// Simulate unique constraint violation error from database
 	mockRepo.On("InsertFeed", ctx, mock.AnythingOfType("database.PublicFeedsInsert")).
 		Return("", errors.New("unique constraint violation"))
 
-	feedID, err := service.CreateFeed(ctx, cmd, userID)
+	feedID, err := service.CreateFeed(ctx, cmd)
 
 	assert.Error(t, err)
 	assert.Equal(t, "", feedID)
-	assert.Equal(t, ErrFeedAlreadyExists, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 409, serviceErr.Code)
 	mockEventRepo.AssertNotCalled(t, "RecordEvent")
 }
 
@@ -261,14 +271,15 @@ func TestCreateFeed_RepositoryError(t *testing.T) {
 	ctx := context.Background()
 	userID := "user-123"
 	cmd := models.CreateFeedCommand{
-		Name: "Tech News",
-		URL:  "https://example.com/feed",
+		UserID: userID,
+		Name:   "Tech News",
+		URL:    "https://example.com/feed",
 	}
 
 	mockRepo.On("InsertFeed", ctx, mock.AnythingOfType("database.PublicFeedsInsert")).
-		Return("", errors.New("unexpected error"))
+		Return("", errors.New("database error"))
 
-	feedID, err := service.CreateFeed(ctx, cmd, userID)
+	feedID, err := service.CreateFeed(ctx, cmd)
 
 	assert.Error(t, err)
 	assert.Equal(t, "", feedID)
@@ -284,8 +295,9 @@ func TestCreateFeed_EventLogError(t *testing.T) {
 	ctx := context.Background()
 	userID := "user-123"
 	cmd := models.CreateFeedCommand{
-		Name: "Tech News",
-		URL:  "https://example.com/feed",
+		UserID: userID,
+		Name:   "Tech News",
+		URL:    "https://example.com/feed",
 	}
 
 	mockRepo.On("InsertFeed", ctx, mock.AnythingOfType("database.PublicFeedsInsert")).
@@ -295,7 +307,7 @@ func TestCreateFeed_EventLogError(t *testing.T) {
 		Return(errors.New("event log failed"))
 
 	// Should not fail if event logging fails, only warn
-	feedID, err := service.CreateFeed(ctx, cmd, userID)
+	feedID, err := service.CreateFeed(ctx, cmd)
 
 	require.NoError(t, err)
 	assert.Equal(t, "feed-123", feedID)
@@ -344,7 +356,10 @@ func TestGetFeedForEdit_NotFound(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Equal(t, ErrFeedNotFound, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 404, serviceErr.Code)
 }
 
 func TestGetFeedForEdit_RepositoryError(t *testing.T) {
@@ -380,8 +395,10 @@ func TestUpdateFeed_NameOnlyUpdate(t *testing.T) {
 	oldURL := "https://example.com/feed"
 
 	cmd := models.UpdateFeedCommand{
-		Name: "Updated Feed Name",
-		URL:  oldURL, // Same URL
+		ID:     feedID,
+		UserID: userID,
+		Name:   "Updated Feed Name",
+		URL:    oldURL, // Same URL
 	}
 
 	existingFeed := &database.PublicFeedsSelect{
@@ -394,7 +411,7 @@ func TestUpdateFeed_NameOnlyUpdate(t *testing.T) {
 	mockRepo.On("FindFeedByIDAndUser", ctx, feedID, userID).Return(existingFeed, nil)
 	mockRepo.On("UpdateFeed", ctx, feedID, mock.AnythingOfType("database.PublicFeedsUpdate")).Return(nil)
 
-	urlChanged, err := service.UpdateFeed(ctx, feedID, userID, cmd)
+	urlChanged, err := service.UpdateFeed(ctx, cmd)
 
 	require.NoError(t, err)
 	assert.False(t, urlChanged)
@@ -414,8 +431,10 @@ func TestUpdateFeed_URLChange(t *testing.T) {
 	newURL := "https://newexample.com/feed"
 
 	cmd := models.UpdateFeedCommand{
-		Name: "Updated Feed Name",
-		URL:  newURL,
+		ID:     feedID,
+		UserID: userID,
+		Name:   "Updated Feed Name",
+		URL:    newURL,
 	}
 
 	existingFeed := &database.PublicFeedsSelect{
@@ -426,10 +445,14 @@ func TestUpdateFeed_URLChange(t *testing.T) {
 	}
 
 	mockRepo.On("FindFeedByIDAndUser", ctx, feedID, userID).Return(existingFeed, nil)
-	mockRepo.On("IsURLTaken", ctx, userID, newURL, feedID).Return(false, nil)
+	mockRepo.On("IsURLTaken", ctx, models.CheckURLTakenQuery{
+		UserID:        userID,
+		URL:           newURL,
+		ExcludeFeedID: feedID,
+	}).Return(false, nil)
 	mockRepo.On("UpdateFeed", ctx, feedID, mock.AnythingOfType("database.PublicFeedsUpdate")).Return(nil)
 
-	urlChanged, err := service.UpdateFeed(ctx, feedID, userID, cmd)
+	urlChanged, err := service.UpdateFeed(ctx, cmd)
 
 	require.NoError(t, err)
 	assert.True(t, urlChanged)
@@ -449,8 +472,10 @@ func TestUpdateFeed_URLConflict(t *testing.T) {
 	newURL := "https://newexample.com/feed"
 
 	cmd := models.UpdateFeedCommand{
-		Name: "Updated Feed Name",
-		URL:  newURL,
+		ID:     feedID,
+		UserID: userID,
+		Name:   "Updated Feed Name",
+		URL:    newURL,
 	}
 
 	existingFeed := &database.PublicFeedsSelect{
@@ -461,13 +486,20 @@ func TestUpdateFeed_URLConflict(t *testing.T) {
 	}
 
 	mockRepo.On("FindFeedByIDAndUser", ctx, feedID, userID).Return(existingFeed, nil)
-	mockRepo.On("IsURLTaken", ctx, userID, newURL, feedID).Return(true, nil)
+	mockRepo.On("IsURLTaken", ctx, models.CheckURLTakenQuery{
+		UserID:        userID,
+		URL:           newURL,
+		ExcludeFeedID: feedID,
+	}).Return(true, nil)
 
-	urlChanged, err := service.UpdateFeed(ctx, feedID, userID, cmd)
+	urlChanged, err := service.UpdateFeed(ctx, cmd)
 
 	assert.Error(t, err)
 	assert.False(t, urlChanged)
-	assert.Equal(t, ErrFeedURLConflict, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 409, serviceErr.Code)
 	mockRepo.AssertNotCalled(t, "UpdateFeed")
 }
 
@@ -482,19 +514,24 @@ func TestUpdateFeed_FeedNotFound(t *testing.T) {
 	userID := "user-123"
 
 	cmd := models.UpdateFeedCommand{
-		Name: "Updated Feed Name",
-		URL:  "https://example.com/feed",
+		ID:     feedID,
+		UserID: userID,
+		Name:   "Updated Feed Name",
+		URL:    "https://example.com/feed",
 	}
 
 	// Simulate not found error from database
 	mockRepo.On("FindFeedByIDAndUser", ctx, feedID, userID).
 		Return(nil, errors.New("not found"))
 
-	urlChanged, err := service.UpdateFeed(ctx, feedID, userID, cmd)
+	urlChanged, err := service.UpdateFeed(ctx, cmd)
 
 	assert.Error(t, err)
 	assert.False(t, urlChanged)
-	assert.Equal(t, ErrFeedNotFound, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 404, serviceErr.Code)
 }
 
 func TestUpdateFeed_UpdateError(t *testing.T) {
@@ -509,8 +546,10 @@ func TestUpdateFeed_UpdateError(t *testing.T) {
 	oldURL := "https://example.com/feed"
 
 	cmd := models.UpdateFeedCommand{
-		Name: "Updated Feed Name",
-		URL:  oldURL,
+		ID:     feedID,
+		UserID: userID,
+		Name:   "Updated Feed Name",
+		URL:    oldURL,
 	}
 
 	existingFeed := &database.PublicFeedsSelect{
@@ -522,9 +561,9 @@ func TestUpdateFeed_UpdateError(t *testing.T) {
 
 	mockRepo.On("FindFeedByIDAndUser", ctx, feedID, userID).Return(existingFeed, nil)
 	mockRepo.On("UpdateFeed", ctx, feedID, mock.AnythingOfType("database.PublicFeedsUpdate")).
-		Return(errors.New("update failed"))
+		Return(errors.New("database error"))
 
-	urlChanged, err := service.UpdateFeed(ctx, feedID, userID, cmd)
+	urlChanged, err := service.UpdateFeed(ctx, cmd)
 
 	assert.Error(t, err)
 	assert.False(t, urlChanged)
@@ -567,7 +606,10 @@ func TestDeleteFeed_NotFound(t *testing.T) {
 	err := service.DeleteFeed(ctx, feedID, userID)
 
 	assert.Error(t, err)
-	assert.Equal(t, ErrFeedNotFound, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 404, serviceErr.Code)
 }
 
 func TestDeleteFeed_RepositoryError(t *testing.T) {

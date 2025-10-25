@@ -30,17 +30,6 @@ templ DeleteConfirmation(vm models.DeleteConfirmationViewModel) {
 		<p id="delete-description" class="text-sm text-base-content/70">
 			This action cannot be undone. All articles from this feed will also be deleted.
 		</p>
-		<!-- Error Display -->
-		if vm.ErrorMessage != "" {
-			<div role="alert" aria-live="assertive" aria-atomic="true" data-testid="delete-confirmation-error">
-				@components.Alert(components.AlertProps{
-					Type:     "error",
-					ShowIcon: true,
-				}) {
-					vm.ErrorMessage
-				}
-			</div>
-		}
 		<!-- Action Buttons -->
 		<footer class="flex gap-2 justify-end">
 			<button

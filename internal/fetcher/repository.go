@@ -61,18 +61,15 @@ func (r *Repository) FindFeedByID(ctx context.Context, feedID string) (*database
 
 // UpdateFeedAfterFetch updates feed status after a fetch attempt
 func (r *Repository) UpdateFeedAfterFetch(ctx context.Context, feedID string, update database.PublicFeedsUpdate) error {
-	var result []database.PublicFeedsSelect
+	var result database.PublicFeedsSelect
 	_, err := r.db.From("feeds").
 		Update(update, "", "").
 		Eq("id", feedID).
+		Single().
 		ExecuteTo(&result)
 
 	if err != nil {
 		return fmt.Errorf("failed to update feed after fetch: %w", err)
-	}
-
-	if len(result) == 0 {
-		return fmt.Errorf("feed not found")
 	}
 
 	return nil

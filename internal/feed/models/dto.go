@@ -148,7 +148,6 @@ func NewFeedFormWithErrors(mode, feedID, name, url string, errors FeedFormErrorV
 // DeleteConfirmationViewModel holds data for the delete confirmation modal.
 // Used by: GET /feeds/{id}/delete
 type DeleteConfirmationViewModel struct {
-	FeedID       string `json:"feed_id"`
-	FeedName     string `json:"feed_name"`
-	ErrorMessage string `json:"error_message,omitempty"`
+	FeedID   string `json:"feed_id"`
+	FeedName string `json:"feed_name"`
 }

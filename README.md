@@ -8,6 +8,7 @@ VibeFeeder is a web application designed to simplify online content consumption.
 - [Tech Stack](#tech-stack)
 - [Getting Started Locally](#getting-started-locally)
 - [Available Scripts](#available-scripts)
+- [Testing](TESTING.md)
 - [Project Scope (MVP)](#project-scope-mvp)
 - [Project Status](#project-status)
 - [License](#license)
@@ -47,6 +48,11 @@ Make sure you have the following tools installed:
 - [Go](https://go.dev/doc/install) (version 1.25)
 - [Node.js](https://nodejs.org/en/download) (version 22)
 - [Go-Task](https://taskfile.dev/installation/)
+- [templ](https://templ.guide/quick-start/installation) - `go install github.com/a-h/templ/cmd/templ@latest`
+- [air](https://github.com/air-verse/air#installation) - `go install github.com/air-verse/air@latest`
+- [goimports](https://pkg.go.dev/golang.org/x/tools/cmd/goimports) - `go install golang.org/x/tools/cmd/goimports@latest`
+- [golangci-lint](https://golangci-lint.run/welcome/install/)
+- [yamllint](https://yamllint.readthedocs.io/en/stable/quickstart.html#installing-yamllint) - `pip install yamllint`
 
 ### Installation & Setup
 
@@ -63,7 +69,13 @@ Make sure you have the following tools installed:
     task install-deps
     ```
 
-3.  **Set up environment variables:**
+3.  **Install Playwright browsers:**
+
+    ```sh
+    npx playwright install
+    ```
+
+4.  **Set up environment variables:**
     Copy `.env.example` to create your local configuration:
 
     ```sh
@@ -72,7 +84,7 @@ Make sure you have the following tools installed:
 
     Edit `.env` to configure your Supabase credentials and other settings.
 
-4.  **Run the development server:**
+5.  **Run the development server:**
     This command starts the development server with hot-reloading for Go, Templ, and CSS changes.
     ```sh
     task dev
@@ -84,16 +96,20 @@ The application should now be running on your local server.
 
 This project uses `Taskfile.yml` to define and run scripts. Below are the most common tasks.
 
-| Command             | Description                                               |
-| ------------------- | --------------------------------------------------------- |
-| `task install-deps` | Install project dependencies.                             |
-| `task dev`          | Run the complete development environment with hot-reload. |
-| `task build`        | Create a production-ready build of the application.       |
-| `task rebuild`      | Clean all build artifacts and then run a new build.       |
-| `task run`          | Run the compiled binary from the `dist/` directory.       |
-| `task clean`        | Remove all build artifacts and generated files.           |
-| `task lint`         | Run all available linters (Go, Prettier).                 |
-| `task fmt`          | Format all code in the project (Go, Templ, others).       |
+| Command             | Description                                                           |
+| ------------------- | --------------------------------------------------------------------- |
+| `task install-deps` | Install project dependencies.                                         |
+| `task dev`          | Run the complete development environment with hot-reload.             |
+| `task build`        | Create a production-ready build of the application.                   |
+| `task rebuild`      | Clean all build artifacts and then run a new build.                   |
+| `task run`          | Run the compiled binary from the `dist/` directory.                   |
+| `task clean`        | Remove all build artifacts and generated files.                       |
+| `task lint`         | Run all available linters (Go, Prettier).                             |
+| `task fmt`          | Format all code in the project (Go, Templ, others).                   |
+| `task test`         | Run all tests (unit + e2e). See [TESTING.md](TESTING.md) for details. |
+| `task docker:build` | Build Docker image with git SHA tag.                                  |
+
+For a complete list of available tasks, run `task --list`.
 
 ## Project Scope (MVP)
 

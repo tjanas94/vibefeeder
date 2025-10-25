@@ -86,17 +86,13 @@ func (r *Repository) InsertFeed(ctx context.Context, feed database.PublicFeedsIn
 		return "", err
 	}
 
-	var result []database.PublicFeedsSelect
-	_, err = client.From("feeds").Insert(feed, false, "", "", "").ExecuteTo(&result)
+	var result database.PublicFeedsSelect
+	_, err = client.From("feeds").Insert(feed, false, "", "", "").Single().ExecuteTo(&result)
 	if err != nil {
 		return "", fmt.Errorf("failed to insert feed: %w", err)
 	}
 
-	if len(result) == 0 {
-		return "", fmt.Errorf("no feed returned after insert")
-	}
-
-	return result[0].Id, nil
+	return result.Id, nil
 }
 
 // FindFeedByIDAndUser retrieves a single feed by ID and user ID
@@ -124,9 +120,9 @@ func (r *Repository) FindFeedByIDAndUser(ctx context.Context, feedID, userID str
 	return &feed, nil
 }
 
-// IsURLTaken checks if a URL is already in use by another feed for the same user
-// excludeFeedID is used to exclude the current feed being updated from the check
-func (r *Repository) IsURLTaken(ctx context.Context, userID, url, excludeFeedID string) (bool, error) {
+// IsURLTaken checks if a URL is already in use by another feed for the same user,
+// excluding the specified feed ID from the check (used during updates)
+func (r *Repository) IsURLTaken(ctx context.Context, query models.CheckURLTakenQuery) (bool, error) {
 	// Get authenticated client for RLS
 	client, err := r.db.NewAuthenticatedClient(ctx)
 	if err != nil {
@@ -136,9 +132,9 @@ func (r *Repository) IsURLTaken(ctx context.Context, userID, url, excludeFeedID 
 	var feeds []database.PublicFeedsSelect
 	_, err = client.From("feeds").
 		Select("id", "", false).
-		Eq("user_id", userID).
-		Eq("url", url).
-		Neq("id", excludeFeedID).
+		Eq("user_id", query.UserID).
+		Eq("url", query.URL).
+		Neq("id", query.ExcludeFeedID).
 		ExecuteTo(&feeds)
 
 	if err != nil {
@@ -156,18 +152,15 @@ func (r *Repository) UpdateFeed(ctx context.Context, feedID string, update datab
 		return err
 	}
 
-	var result []database.PublicFeedsSelect
+	var result database.PublicFeedsSelect
 	_, err = client.From("feeds").
 		Update(update, "", "").
 		Eq("id", feedID).
+		Single().
 		ExecuteTo(&result)
 
 	if err != nil {
 		return fmt.Errorf("failed to update feed: %w", err)
-	}
-
-	if len(result) == 0 {
-		return fmt.Errorf("feed not found")
 	}
 
 	return nil
@@ -175,27 +168,23 @@ func (r *Repository) UpdateFeed(ctx context.Context, feedID string, update datab
 
 // DeleteFeed deletes a feed from the database by ID and user ID
 // Returns error that can be checked with database.IsNotFoundError if feed doesn't exist or doesn't belong to user
-func (r *Repository) DeleteFeed(ctx context.Context, id, userID string) error {
+func (r *Repository) DeleteFeed(ctx context.Context, feedID, userID string) error {
 	// Get authenticated client for RLS
 	client, err := r.db.NewAuthenticatedClient(ctx)
 	if err != nil {
 		return err
 	}
 
-	var result []database.PublicFeedsSelect
+	var result database.PublicFeedsSelect
 	_, err = client.From("feeds").
 		Delete("", "").
-		Eq("id", id).
+		Eq("id", feedID).
 		Eq("user_id", userID).
+		Single().
 		ExecuteTo(&result)
 
 	if err != nil {
 		return fmt.Errorf("failed to delete feed: %w", err)
-	}
-
-	// Check if any rows were affected
-	if len(result) == 0 {
-		return fmt.Errorf("feed not found")
 	}
 
 	return nil

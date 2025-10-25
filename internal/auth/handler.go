@@ -1,68 +1,50 @@
 package auth
 
 import (
-	"log/slog"
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/auth/models"
 	"github.com/tjanas94/vibefeeder/internal/auth/view"
+	sharedAuth "github.com/tjanas94/vibefeeder/internal/shared/auth"
+	sharederrors "github.com/tjanas94/vibefeeder/internal/shared/errors"
 	"github.com/tjanas94/vibefeeder/internal/shared/validator"
 )
 
 // Handler handles HTTP requests for authentication
 type Handler struct {
 	service        *Service
-	sessionManager *SessionManager
-	logger         *slog.Logger
+	sessionManager sharedAuth.SessionManager
 	requireRegCode bool // Whether registration code is required
 }
 
 // NewHandler creates a new auth handler
-func NewHandler(service *Service, sessionManager *SessionManager, logger *slog.Logger, requireRegCode bool) *Handler {
+func NewHandler(service *Service, sessionManager sharedAuth.SessionManager, requireRegCode bool) *Handler {
 	return &Handler{
 		service:        service,
 		sessionManager: sessionManager,
-		logger:         logger,
 		requireRegCode: requireRegCode,
 	}
 }
 
 // ShowLoginPage renders the login page
 func (h *Handler) ShowLoginPage(c echo.Context) error {
-	props := view.LoginPageProps{
-		ShowConfirmedToast:    c.QueryParam("confirmed") == "true",
-		ShowResetSuccessToast: c.QueryParam("reset_success") == "true",
-	}
-
-	// Handle confirmation errors
-	errorParam := c.QueryParam("error")
-	if errorParam != "" {
-		props.ShowErrorAlert = true
-		switch errorParam {
-		case "missing_token":
-			props.ErrorMessage = "Invalid confirmation link. Please check your email and try again."
-		case "invalid_token":
-			props.ErrorMessage = "Confirmation link is invalid or expired. Please register again or contact support."
-		default:
-			props.ErrorMessage = "An error occurred during confirmation. Please try again."
-		}
-	}
-
+	var query models.LoginPageQuery
+	_ = c.Bind(&query)
+	props := query.ToViewProps()
 	return c.Render(http.StatusOK, "", view.LoginPage(props))
 }
 
 // HandleLogin processes login form submission
 func (h *Handler) HandleLogin(c echo.Context) error {
 	var req models.LoginRequest
+	// Path 1: Handle bind errors (invalid request format)
 	if err := c.Bind(&req); err != nil {
-		h.logger.Error("Failed to bind login request", "error", err)
-		return c.Render(http.StatusBadRequest, "", view.LoginForm(view.LoginPageProps{
-			GeneralError: "Invalid form data",
-		}))
+		return echo.NewHTTPError(http.StatusBadRequest, err)
 	}
 
-	// Validate request
+	// Path 2: Handle validation errors (invalid data)
 	if err := c.Validate(req); err != nil {
 		fieldErrors := validator.ParseFieldErrors(err)
 
@@ -78,19 +60,24 @@ func (h *Handler) HandleLogin(c echo.Context) error {
 	// Attempt login
 	session, err := h.service.Login(c.Request().Context(), req)
 	if err != nil {
-		props := view.LoginPageProps{
-			Email:        req.Email,
-			GeneralError: "Invalid email or password",
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			props := view.LoginPageProps{
+				Email:        req.Email,
+				GeneralError: serviceErr.Message,
+			}
+			return c.Render(serviceErr.Code, "", view.LoginForm(props))
 		}
-		return c.Render(http.StatusUnauthorized, "", view.LoginForm(props))
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// Set session cookies
 	h.sessionManager.SetSessionCookies(c, session)
 
 	// Redirect to dashboard using HX-Redirect header
-	c.Response().Header().Set("HX-Redirect", "/dashboard")
-	return c.NoContent(http.StatusOK)
+	return h.htmxRedirect(c, "/dashboard")
 }
 
 // ShowRegisterPage renders the registration page
@@ -103,15 +90,12 @@ func (h *Handler) ShowRegisterPage(c echo.Context) error {
 // HandleRegister processes registration form submission
 func (h *Handler) HandleRegister(c echo.Context) error {
 	var req models.RegisterRequest
+	// Path 1: Handle bind errors (invalid request format)
 	if err := c.Bind(&req); err != nil {
-		h.logger.Error("Failed to bind register request", "error", err)
-		return c.Render(http.StatusBadRequest, "", view.RegisterForm(view.RegisterPageProps{
-			GeneralError: "Invalid form data",
-			RequireCode:  h.requireRegCode,
-		}))
+		return echo.NewHTTPError(http.StatusBadRequest, err)
 	}
 
-	// Validate request
+	// Path 2: Handle validation errors (invalid data)
 	if err := c.Validate(req); err != nil {
 		fieldErrors := validator.ParseFieldErrors(err)
 
@@ -135,16 +119,17 @@ func (h *Handler) HandleRegister(c echo.Context) error {
 			RequireCode:      h.requireRegCode,
 		}
 
-		switch err {
-		case ErrUserAlreadyExists:
-			props.EmailError = "User with this email already exists"
-		case ErrInvalidRegistrationCode:
-			props.RegistrationCodeError = "Invalid registration code"
-		default:
-			props.GeneralError = "Failed to register account. Please try again later"
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			props.GeneralError = serviceErr.Message
+			props.EmailError = serviceErr.FieldErrors["Email"]
+			props.RegistrationCodeError = serviceErr.FieldErrors["RegistrationCode"]
+			return c.Render(serviceErr.Code, "", view.RegisterForm(props))
 		}
 
-		return c.Render(http.StatusUnprocessableEntity, "", view.RegisterForm(props))
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// Show pending confirmation view
@@ -158,13 +143,11 @@ func (h *Handler) HandleConfirm(c echo.Context) error {
 	// Get token from query parameter
 	token := c.QueryParam("token")
 	if token == "" {
-		h.logger.Error("Email confirmation failed: missing token")
 		return c.Redirect(http.StatusFound, "/auth/login?error=missing_token")
 	}
 
 	// Verify the email confirmation token
 	if err := h.service.VerifyEmailConfirmation(c.Request().Context(), token); err != nil {
-		h.logger.Error("Email confirmation failed", "error", err)
 		return c.Redirect(http.StatusFound, "/auth/login?error=invalid_token")
 	}
 
@@ -185,8 +168,7 @@ func (h *Handler) HandleLogout(c echo.Context) error {
 	h.sessionManager.ClearSessionCookies(c)
 
 	// Redirect to login page
-	c.Response().Header().Set("HX-Redirect", "/auth/login")
-	return c.NoContent(http.StatusOK)
+	return h.htmxRedirect(c, "/auth/login")
 }
 
 // ShowForgotPasswordPage renders the forgot password page
@@ -197,14 +179,12 @@ func (h *Handler) ShowForgotPasswordPage(c echo.Context) error {
 // HandleForgotPassword processes forgot password form submission
 func (h *Handler) HandleForgotPassword(c echo.Context) error {
 	var req models.ForgotPasswordRequest
+	// Path 1: Handle bind errors (invalid request format)
 	if err := c.Bind(&req); err != nil {
-		h.logger.Error("Failed to bind forgot password request", "error", err)
-		return c.Render(http.StatusBadRequest, "", view.ForgotPasswordForm(view.ForgotPasswordPageProps{
-			EmailError: "Invalid form data",
-		}))
+		return echo.NewHTTPError(http.StatusBadRequest, err)
 	}
 
-	// Validate request
+	// Path 2: Handle validation errors (invalid data)
 	if err := c.Validate(req); err != nil {
 		fieldErrors := validator.ParseFieldErrors(err)
 
@@ -242,15 +222,12 @@ func (h *Handler) ShowResetPasswordPage(c echo.Context) error {
 // HandleResetPassword processes reset password form submission
 func (h *Handler) HandleResetPassword(c echo.Context) error {
 	var req models.ResetPasswordRequest
+	// Path 1: Handle bind errors (invalid request format)
 	if err := c.Bind(&req); err != nil {
-		h.logger.Error("Failed to bind reset password request", "error", err)
-		return c.Render(http.StatusBadRequest, "", view.ResetPasswordForm(view.ResetPasswordPageProps{
-			Token:        req.Token,
-			GeneralError: "Invalid form data",
-		}))
+		return echo.NewHTTPError(http.StatusBadRequest, err)
 	}
 
-	// Validate request
+	// Path 2: Handle validation errors (invalid data)
 	if err := c.Validate(req); err != nil {
 		fieldErrors := validator.ParseFieldErrors(err)
 
@@ -269,21 +246,25 @@ func (h *Handler) HandleResetPassword(c echo.Context) error {
 			Token: req.Token,
 		}
 
-		switch err {
-		case ErrSamePassword:
-			props.PasswordError = "New password must be different from your current password"
-			return c.Render(http.StatusUnprocessableEntity, "", view.ResetPasswordForm(props))
-		case ErrInvalidToken:
-			props.GeneralError = "Password reset link is invalid or expired. Please request a new one."
-			return c.Render(http.StatusBadRequest, "", view.ResetPasswordForm(props))
-		default:
-			props.GeneralError = "Failed to reset password. Please try again later"
-			return c.Render(http.StatusBadRequest, "", view.ResetPasswordForm(props))
+		// Path 3: Handle business errors (ServiceError)
+		var serviceErr *sharederrors.ServiceError
+		if errors.As(err, &serviceErr) {
+			props.GeneralError = serviceErr.Message
+			props.PasswordError = serviceErr.FieldErrors["Password"]
+			return c.Render(serviceErr.Code, "", view.ResetPasswordForm(props))
 		}
+
+		// Path 4: Unexpected error - delegate to global error handler
+		return err
 	}
 
 	// DO NOT set session cookies - user must log in with new password
 	// Redirect to login with success message
-	c.Response().Header().Set("HX-Redirect", "/auth/login?reset_success=true")
+	return h.htmxRedirect(c, "/auth/login?reset_success=true")
+}
+
+// htmxRedirect sets the HX-Redirect header and returns NoContent status
+func (h *Handler) htmxRedirect(c echo.Context, path string) error {
+	c.Response().Header().Set("HX-Redirect", path)
 	return c.NoContent(http.StatusOK)
 }

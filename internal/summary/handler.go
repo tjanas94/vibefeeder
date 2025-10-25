@@ -1,14 +1,12 @@
 package summary
 
 import (
-	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/tjanas94/vibefeeder/internal/shared/auth"
-	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	sharederrors "github.com/tjanas94/vibefeeder/internal/shared/errors"
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 	"github.com/tjanas94/vibefeeder/internal/summary/view"
 )
@@ -16,21 +14,13 @@ import (
 // Handler handles HTTP requests for summary operations
 type Handler struct {
 	service *Service
-	logger  *slog.Logger
 }
 
 // NewHandler creates a new summary handler
-func NewHandler(service *Service, logger *slog.Logger) *Handler {
+func NewHandler(service *Service) *Handler {
 	return &Handler{
 		service: service,
-		logger:  logger,
 	}
-}
-
-// contextWithToken adds the access token from Echo context to request context for RLS
-func (h *Handler) contextWithToken(c echo.Context) context.Context {
-	token := auth.GetAccessToken(c)
-	return database.ContextWithToken(c.Request().Context(), token)
 }
 
 // GenerateSummary handles POST /summaries endpoint
@@ -39,45 +29,10 @@ func (h *Handler) GenerateSummary(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
-	// Add access token to context for RLS
-	ctx := h.contextWithToken(c)
-
 	// Call service to generate summary and get view model
-	vm, err := h.service.GenerateSummary(ctx, userID)
-
-	// Domain / expected errors are embedded into the Display view via ErrorMessage
+	vm, err := h.service.GenerateSummary(c.Request().Context(), userID)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrNoArticlesFound):
-			h.logger.Info("no articles found for user", "error", err)
-			errVM := &models.SummaryDisplayViewModel{
-				ErrorMessage: err.Error(),
-				// User has at least one feed if they attempted generation; allow retry button.
-				CanGenerate: true,
-			}
-			return c.Render(http.StatusNotFound, "", view.Display(*errVM))
-		case errors.Is(err, ErrAIServiceUnavailable):
-			h.logger.Warn("AI service unavailable", "error", err)
-			errVM := &models.SummaryDisplayViewModel{
-				ErrorMessage: err.Error(),
-				CanGenerate:  true,
-			}
-			return c.Render(http.StatusServiceUnavailable, "", view.Display(*errVM))
-		case errors.Is(err, ErrDatabase):
-			h.logger.Error("database error", "error", err)
-			errVM := &models.SummaryDisplayViewModel{
-				ErrorMessage: err.Error(),
-				CanGenerate:  true,
-			}
-			return c.Render(http.StatusInternalServerError, "", view.Display(*errVM))
-		default:
-			h.logger.Error("unexpected summary generation error", "error", err)
-			errVM := &models.SummaryDisplayViewModel{
-				ErrorMessage: "An unexpected error occurred",
-				CanGenerate:  true,
-			}
-			return c.Render(http.StatusInternalServerError, "", view.Display(*errVM))
-		}
+		return h.handleServiceError(c, err, "service error during summary generation", "code", "message")
 	}
 
 	// Success - render display view with view model
@@ -90,17 +45,28 @@ func (h *Handler) GetLatestSummary(c echo.Context) error {
 	// Get user ID from authenticated session
 	userID := auth.GetUserID(c)
 
-	// Add access token to context for RLS
-	ctx := h.contextWithToken(c)
-
 	// Call service to get latest summary and view model
-	vm, err := h.service.GetLatestSummaryForUser(ctx, userID)
+	vm, err := h.service.GetLatestSummaryForUser(c.Request().Context(), userID)
 	if err != nil {
-		h.logger.Error("failed to get latest summary", "user_id", userID, "error", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to load summary")
+		return h.handleServiceError(c, err, "service error getting latest summary", "user_id", userID, "code")
 	}
 
 	// Success - add HX-Trigger header to open modal and render display view with view model
 	c.Response().Header().Set("HX-Trigger", `{"openModal": {"modal": "summary"}}`)
 	return c.Render(http.StatusOK, "", view.Display(*vm))
+}
+
+// handleServiceError handles ServiceError responses with logging and error view rendering.
+// If err is a ServiceError, logs a warning and renders an error view.
+// If err is not a ServiceError, returns the error for global error handler processing.
+func (h *Handler) handleServiceError(c echo.Context, err error, logMsg string, logAttrs ...any) error {
+	var serviceErr *sharederrors.ServiceError
+	if errors.As(err, &serviceErr) {
+		errVM := &models.SummaryDisplayViewModel{
+			ErrorMessage: serviceErr.Message,
+			CanGenerate:  true,
+		}
+		return c.Render(serviceErr.Code, "", view.Display(*errVM))
+	}
+	return err
 }

@@ -63,20 +63,17 @@ func (r *Repository) SaveSummary(ctx context.Context, userID, content string) (*
 
 	insert := models.ToInsert(userID, content)
 
-	var result []database.PublicSummariesSelect
+	var result database.PublicSummariesSelect
 	_, err = client.From("summaries").
 		Insert(insert, false, "", "", "").
+		Single().
 		ExecuteTo(&result)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if len(result) == 0 {
-		return nil, fmt.Errorf("no summary returned after insert")
-	}
-
-	return &result[0], nil
+	return &result, nil
 }
 
 // GetLatestSummary retrieves the most recent summary for a user

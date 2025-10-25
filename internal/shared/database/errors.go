@@ -25,6 +25,7 @@ func IsNotFoundError(err error) bool {
 	}
 	errMsg := strings.ToLower(err.Error())
 	return strings.Contains(errMsg, "not found") ||
+		strings.Contains(errMsg, "single json object") ||
 		strings.Contains(errMsg, "no rows") ||
 		strings.Contains(errMsg, "404")
 }

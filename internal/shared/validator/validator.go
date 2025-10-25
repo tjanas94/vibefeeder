@@ -3,11 +3,8 @@ package validator
 import (
 	"fmt"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	passwordvalidator "github.com/wagslane/go-password-validator"
 )
@@ -21,28 +18,12 @@ type CustomValidator struct {
 func New() *CustomValidator {
 	v := validator.New()
 
-	// Register custom validation for http/https URLs
-	_ = v.RegisterValidation("httpurl", validateHTTPURL)
-
 	// Register custom validation for strong passwords
 	_ = v.RegisterValidation("strongpassword", validateStrongPassword)
 
 	return &CustomValidator{
 		validator: v,
 	}
-}
-
-// validateHTTPURL validates that a URL has http or https scheme
-func validateHTTPURL(fl validator.FieldLevel) bool {
-	urlStr := fl.Field().String()
-
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return false
-	}
-
-	scheme := strings.ToLower(parsedURL.Scheme)
-	return scheme == "http" || scheme == "https"
 }
 
 // validateStrongPassword validates password strength using entropy
@@ -106,7 +87,7 @@ func formatFieldError(err validator.FieldError) string {
 		return "Must be a valid email address"
 	case "url":
 		return "Must be a valid URL"
-	case "httpurl":
+	case "http_url":
 		return "Must be a valid HTTP or HTTPS URL"
 	case "strongpassword":
 		return "Make password longer or add numbers and symbols"
@@ -135,12 +116,4 @@ func formatFieldError(err validator.FieldError) string {
 	default:
 		return fmt.Sprintf("Failed validation: %s", tag)
 	}
-}
-
-// IsValidUUID checks if a string is a valid UUID format.
-// Returns true if valid, false otherwise.
-// Use this for validating path/query parameters that should be UUIDs.
-func IsValidUUID(s string) bool {
-	_, err := uuid.Parse(s)
-	return err == nil
 }

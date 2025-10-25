@@ -14,6 +14,7 @@ import (
 	"github.com/tjanas94/vibefeeder/internal/feed"
 	"github.com/tjanas94/vibefeeder/internal/fetcher"
 	"github.com/tjanas94/vibefeeder/internal/shared/ai"
+	sharedAuth "github.com/tjanas94/vibefeeder/internal/shared/auth"
 	"github.com/tjanas94/vibefeeder/internal/shared/config"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
 	"github.com/tjanas94/vibefeeder/internal/shared/events"
@@ -49,9 +50,8 @@ type Container struct {
 	SummaryHandler   *summary.Handler
 
 	// Middleware and utilities
-	SessionManager        *authModule.SessionManager
-	AuthMiddlewareAdapter *authModule.MiddlewareAdapter
-	RateLimiterStore      *middleware.RateLimiterMemoryStore
+	SessionManager   sharedAuth.SessionManager
+	RateLimiterStore *middleware.RateLimiterMemoryStore
 }
 
 // New creates and initializes a new dependency injection container
@@ -99,9 +99,10 @@ func (c *Container) initRepositories() error {
 // initServices initializes all service instances
 func (c *Container) initServices() error {
 	// Initialize auth service
-	authClient := gotrue.New("dummy", c.Config.Supabase.Key).
+	goTrueClient := gotrue.New("dummy", c.Config.Supabase.Key).
 		WithCustomGoTrueURL(c.Config.Supabase.URL + "/auth/v1")
-	c.AuthService = authModule.NewService(authClient, c.EventsRepo, &c.Config.Auth, c.Logger)
+	authAdapter := sharedAuth.NewGoTrueClientAdapter(goTrueClient)
+	c.AuthService = authModule.NewService(authAdapter, c.EventsRepo, &c.Config.Auth, c.Logger)
 
 	// Initialize feed service
 	c.FeedService = feed.NewService(c.FeedRepo, c.EventsRepo, c.Logger)
@@ -140,10 +141,7 @@ func (c *Container) initServices() error {
 // initMiddleware initializes middleware and utility instances
 func (c *Container) initMiddleware() error {
 	// Initialize session manager
-	c.SessionManager = authModule.NewSessionManager(&c.Config.Auth)
-
-	// Initialize auth middleware adapter
-	c.AuthMiddlewareAdapter = authModule.NewMiddlewareAdapter(c.AuthService)
+	c.SessionManager = sharedAuth.NewSessionManager(&c.Config.Auth)
 
 	// Initialize rate limiter store
 	c.RateLimiterStore = middleware.NewRateLimiterMemoryStoreWithConfig(
@@ -160,16 +158,16 @@ func (c *Container) initMiddleware() error {
 func (c *Container) initHandlers() error {
 	// Initialize auth handler
 	requireRegCode := c.Config.Auth.RegistrationCode != ""
-	c.AuthHandler = authModule.NewHandler(c.AuthService, c.SessionManager, c.Logger, requireRegCode)
+	c.AuthHandler = authModule.NewHandler(c.AuthService, c.SessionManager, requireRegCode)
 
 	// Initialize dashboard handler
-	c.DashboardHandler = dashboard.NewHandler(c.Logger)
+	c.DashboardHandler = dashboard.NewHandler()
 
 	// Initialize feed handler
-	c.FeedHandler = feed.NewHandler(c.FeedService, c.Logger, c.FeedFetcher)
+	c.FeedHandler = feed.NewHandler(c.FeedService, c.FeedFetcher)
 
 	// Initialize summary handler
-	c.SummaryHandler = summary.NewHandler(c.SummaryService, c.Logger)
+	c.SummaryHandler = summary.NewHandler(c.SummaryService)
 
 	return nil
 }

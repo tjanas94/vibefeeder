@@ -4,8 +4,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mmcdole/gofeed"
 )
 
 // calculateNextFetch calculates the next fetch time based on Cache-Control header
@@ -55,47 +53,6 @@ func calculateBackoff(retryCount int, now time.Time) time.Time {
 	}
 
 	return now.Add(time.Duration(backoffMinutes) * time.Minute)
-}
-
-// transformFeedItems transforms gofeed items to our Article format
-func transformFeedItems(items []*gofeed.Item, now time.Time) []Article {
-	articles := make([]Article, 0, len(items))
-
-	for _, item := range items {
-		// Skip items without required fields
-		if item.Title == "" || item.Link == "" {
-			continue
-		}
-
-		// Parse published date
-		var publishedAt time.Time
-		if item.PublishedParsed != nil {
-			publishedAt = *item.PublishedParsed
-		} else if item.UpdatedParsed != nil {
-			publishedAt = *item.UpdatedParsed
-		} else {
-			publishedAt = now
-		}
-
-		// Use description or content
-		var content *string
-		if item.Description != "" {
-			content = &item.Description
-		} else if item.Content != "" {
-			content = &item.Content
-		}
-
-		article := Article{
-			Title:       item.Title,
-			URL:         item.Link,
-			Content:     content,
-			PublishedAt: publishedAt,
-		}
-
-		articles = append(articles, article)
-	}
-
-	return articles
 }
 
 // parseRetryAfter parses the Retry-After header and returns the next fetch time

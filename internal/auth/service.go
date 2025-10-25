@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/supabase-community/gotrue-go"
 	"github.com/supabase-community/gotrue-go/types"
 	"github.com/tjanas94/vibefeeder/internal/auth/models"
+	sharedAuth "github.com/tjanas94/vibefeeder/internal/shared/auth"
 	"github.com/tjanas94/vibefeeder/internal/shared/config"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
 	"github.com/tjanas94/vibefeeder/internal/shared/events"
@@ -15,14 +15,14 @@ import (
 
 // Service handles authentication business logic
 type Service struct {
-	authClient gotrue.Client
+	authClient sharedAuth.GoTrueAdapter
 	eventRepo  events.EventRepository
 	config     *config.AuthConfig
 	logger     *slog.Logger
 }
 
 // NewService creates a new auth service
-func NewService(authClient gotrue.Client, eventRepo events.EventRepository, cfg *config.AuthConfig, logger *slog.Logger) *Service {
+func NewService(authClient sharedAuth.GoTrueAdapter, eventRepo events.EventRepository, cfg *config.AuthConfig, logger *slog.Logger) *Service {
 	return &Service{
 		authClient: authClient,
 		eventRepo:  eventRepo,
@@ -36,7 +36,7 @@ func (s *Service) Register(ctx context.Context, req models.RegisterRequest) erro
 	// Validate registration code if configured (constant-time comparison to prevent timing attacks)
 	if !validateRegistrationCode(req.RegistrationCode, s.config.RegistrationCode) {
 		s.logger.Debug("Invalid registration code attempt", "email", req.Email)
-		return ErrInvalidRegistrationCode
+		return NewInvalidRegistrationCodeError()
 	}
 
 	// Build redirect URL for email confirmation
@@ -46,7 +46,7 @@ func (s *Service) Register(ctx context.Context, req models.RegisterRequest) erro
 	resp, err := s.authClient.Signup(types.SignupRequest{
 		Email:    req.Email,
 		Password: req.Password,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"redirect_to": redirectURL,
 		},
 	})
@@ -55,49 +55,39 @@ func (s *Service) Register(ctx context.Context, req models.RegisterRequest) erro
 		// Check if user already exists
 		if isUserExistsError(err) {
 			s.logger.Debug("User registration attempt with existing email", "email", req.Email)
-			return ErrUserAlreadyExists
+			return NewUserAlreadyExistsError()
 		}
-		s.logger.Error("Failed to register user", "error", err, "email", req.Email)
 		return fmt.Errorf("registration failed: %w", err)
 	}
 
 	// Log registration event
 	userID := resp.ID.String()
-	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
-		UserId:    &userID,
-		EventType: events.EventUserRegistered,
-		Metadata:  nil,
-	}); err != nil {
-		s.logger.Error("Failed to log event", "event_type", events.EventUserRegistered, "error", err, "user_id", userID)
-	}
+	s.recordUserEvent(ctx, userID, events.EventUserRegistered)
 
 	s.logger.Info("User registered successfully", "user_id", userID, "email", req.Email)
 	return nil
 }
 
 // Login authenticates a user and returns session data
-func (s *Service) Login(ctx context.Context, req models.LoginRequest) (*models.UserSession, error) {
+func (s *Service) Login(ctx context.Context, req models.LoginRequest) (*sharedAuth.UserSession, error) {
 	// Authenticate with Supabase using SignInWithEmailPassword
 	resp, err := s.authClient.SignInWithEmailPassword(req.Email, req.Password)
 
 	if err != nil {
-		s.logger.Debug("Login failed", "error", err, "email", req.Email)
-		return nil, ErrInvalidCredentials
+		if isInvalidCredentialsError(err) {
+			s.logger.Debug("Login failed with invalid credentials", "email", req.Email)
+			return nil, NewInvalidCredentialsError()
+		}
+		return nil, fmt.Errorf("login failed: %w", err)
 	}
 
 	// Log login event
 	userID := resp.User.ID.String()
-	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
-		UserId:    &userID,
-		EventType: events.EventUserLogin,
-		Metadata:  nil,
-	}); err != nil {
-		s.logger.Error("Failed to log event", "event_type", events.EventUserLogin, "error", err, "user_id", userID)
-	}
+	s.recordUserEvent(ctx, userID, events.EventUserLogin)
 
 	s.logger.Info("User logged in successfully", "user_id", userID, "email", req.Email)
 
-	return &models.UserSession{
+	return &sharedAuth.UserSession{
 		UserID:       userID,
 		Email:        resp.User.Email,
 		AccessToken:  resp.AccessToken,
@@ -106,17 +96,17 @@ func (s *Service) Login(ctx context.Context, req models.LoginRequest) (*models.U
 }
 
 // RefreshSession refreshes an expired access token using refresh token
-func (s *Service) RefreshSession(ctx context.Context, refreshToken string) (*models.UserSession, error) {
+func (s *Service) RefreshSession(ctx context.Context, refreshToken string) (*sharedAuth.UserSession, error) {
 	resp, err := s.authClient.RefreshToken(refreshToken)
 	if err != nil {
 		s.logger.Debug("Token refresh failed", "error", err)
-		return nil, ErrSessionExpired
+		return nil, NewSessionExpiredError()
 	}
 
 	userID := resp.User.ID.String()
 	s.logger.Debug("Session refreshed successfully", "user_id", userID)
 
-	return &models.UserSession{
+	return &sharedAuth.UserSession{
 		UserID:       userID,
 		Email:        resp.User.Email,
 		AccessToken:  resp.AccessToken,
@@ -125,17 +115,17 @@ func (s *Service) RefreshSession(ctx context.Context, refreshToken string) (*mod
 }
 
 // GetUserByToken retrieves user information from an access token
-func (s *Service) GetUserByToken(ctx context.Context, accessToken string) (*models.UserSession, error) {
+func (s *Service) GetUserByToken(ctx context.Context, accessToken string) (*sharedAuth.UserSession, error) {
 	// Create a client with the access token
 	client := s.authClient.WithToken(accessToken)
 
 	resp, err := client.GetUser()
 	if err != nil {
 		s.logger.Debug("Failed to get user by token", "error", err)
-		return nil, ErrSessionExpired
+		return nil, NewSessionExpiredError()
 	}
 
-	return &models.UserSession{
+	return &sharedAuth.UserSession{
 		UserID:      resp.ID.String(),
 		Email:       resp.Email,
 		AccessToken: accessToken,
@@ -174,48 +164,6 @@ func (s *Service) SendPasswordResetEmail(ctx context.Context, email string) erro
 	return nil
 }
 
-// verifyRecoveryToken verifies a password recovery token and returns a session
-func (s *Service) verifyRecoveryToken(ctx context.Context, tokenHash string) (*models.UserSession, error) {
-	// Build redirect URL
-	redirectURL := fmt.Sprintf("%s/auth/reset-password", s.config.RedirectURL)
-
-	// Verify the token using Supabase Auth's verify endpoint
-	resp, err := s.authClient.Verify(types.VerifyRequest{
-		Type:       "recovery",
-		Token:      tokenHash,
-		RedirectTo: redirectURL,
-	})
-
-	if err != nil {
-		s.logger.Error("Failed to verify recovery token", "error", err)
-		return nil, ErrInvalidToken
-	}
-
-	// Check if verification was successful
-	if resp.Error != "" {
-		s.logger.Error("Token verification failed", "error", resp.Error, "error_code", resp.ErrorCode)
-		return nil, ErrInvalidToken
-	}
-
-	// Get user information using the access token
-	client := s.authClient.WithToken(resp.AccessToken)
-	user, err := client.GetUser()
-	if err != nil {
-		s.logger.Error("Failed to get user after token verification", "error", err)
-		return nil, ErrInvalidToken
-	}
-
-	userID := user.ID.String()
-	s.logger.Info("Recovery token verified successfully", "user_id", userID)
-
-	return &models.UserSession{
-		UserID:       userID,
-		Email:        user.Email,
-		AccessToken:  resp.AccessToken,
-		RefreshToken: resp.RefreshToken,
-	}, nil
-}
-
 // VerifyEmailConfirmation verifies an email confirmation token from signup
 func (s *Service) VerifyEmailConfirmation(ctx context.Context, tokenHash string) error {
 	// Build redirect URL
@@ -230,13 +178,13 @@ func (s *Service) VerifyEmailConfirmation(ctx context.Context, tokenHash string)
 
 	if err != nil {
 		s.logger.Error("Failed to verify email confirmation token", "error", err)
-		return ErrInvalidToken
+		return NewInvalidTokenError()
 	}
 
 	// Check if verification was successful
 	if resp.Error != "" {
 		s.logger.Error("Email confirmation failed", "error", resp.Error, "error_code", resp.ErrorCode)
-		return ErrInvalidToken
+		return NewInvalidTokenError()
 	}
 
 	// Get user information using the access token
@@ -244,20 +192,14 @@ func (s *Service) VerifyEmailConfirmation(ctx context.Context, tokenHash string)
 	user, err := client.GetUser()
 	if err != nil {
 		s.logger.Error("Failed to get user after email confirmation", "error", err)
-		return ErrInvalidToken
+		return NewInvalidTokenError()
 	}
 
 	userID := user.ID.String()
 	s.logger.Info("Email confirmed successfully", "user_id", userID, "email", user.Email)
 
 	// Log email confirmation event
-	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
-		UserId:    &userID,
-		EventType: events.EventUserEmailConfirmed,
-		Metadata:  nil,
-	}); err != nil {
-		s.logger.Error("Failed to log event", "event_type", events.EventUserEmailConfirmed, "error", err, "user_id", userID)
-	}
+	s.recordUserEvent(ctx, userID, events.EventUserEmailConfirmed)
 
 	return nil
 }
@@ -279,25 +221,80 @@ func (s *Service) ResetPassword(ctx context.Context, tokenHash, newPassword stri
 	})
 
 	if err != nil {
-		// Check if user tried to use the same password
 		if isSamePasswordError(err) {
 			s.logger.Debug("User attempted to reset password to the same value", "user_id", session.UserID)
-			return ErrSamePassword
+			return NewSamePasswordError()
 		}
-		s.logger.Error("Failed to reset password", "error", err)
-		return ErrInvalidToken
+		if isInvalidTokenError(err) {
+			s.logger.Debug("Token error during password reset", "user_id", session.UserID)
+			return NewInvalidTokenError()
+		}
+		return fmt.Errorf("reset password failed: %w", err)
 	}
 
 	// Log password reset event
 	userID := resp.ID.String()
-	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
-		UserId:    &userID,
-		EventType: events.EventUserPasswordReset,
-		Metadata:  nil,
-	}); err != nil {
-		s.logger.Error("Failed to log event", "event_type", events.EventUserPasswordReset, "error", err, "user_id", userID)
-	}
+	s.recordUserEvent(ctx, userID, events.EventUserPasswordReset)
 
 	s.logger.Info("Password reset successfully", "user_id", userID)
 	return nil
+}
+
+// verifyRecoveryToken verifies a password recovery token and returns a session
+func (s *Service) verifyRecoveryToken(ctx context.Context, tokenHash string) (*sharedAuth.UserSession, error) {
+	// Build redirect URL
+	redirectURL := fmt.Sprintf("%s/auth/reset-password", s.config.RedirectURL)
+
+	// Verify the token using Supabase Auth's verify endpoint
+	resp, err := s.authClient.Verify(types.VerifyRequest{
+		Type:       "recovery",
+		Token:      tokenHash,
+		RedirectTo: redirectURL,
+	})
+
+	if err != nil {
+		if isInvalidTokenError(err) {
+			s.logger.Debug("Invalid recovery token", "error", err)
+			return nil, NewInvalidTokenError()
+		}
+		return nil, fmt.Errorf("token verification failed: %w", err)
+	}
+
+	// Check if verification was successful
+	if resp.Error != "" {
+		s.logger.Debug("Token verification failed", "error", resp.Error, "error_code", resp.ErrorCode)
+		return nil, NewInvalidTokenError()
+	}
+
+	// Get user information using the access token
+	client := s.authClient.WithToken(resp.AccessToken)
+	user, err := client.GetUser()
+	if err != nil {
+		if isInvalidTokenError(err) {
+			s.logger.Debug("Invalid token during user retrieval", "error", err)
+			return nil, NewInvalidTokenError()
+		}
+		return nil, fmt.Errorf("failed to get user after token verification: %w", err)
+	}
+
+	userID := user.ID.String()
+	s.logger.Info("Recovery token verified successfully", "user_id", userID)
+
+	return &sharedAuth.UserSession{
+		UserID:       userID,
+		Email:        user.Email,
+		AccessToken:  resp.AccessToken,
+		RefreshToken: resp.RefreshToken,
+	}, nil
+}
+
+// recordUserEvent records an event for a user with the specified event type
+func (s *Service) recordUserEvent(ctx context.Context, userID string, eventType string) {
+	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
+		UserId:    &userID,
+		EventType: eventType,
+		Metadata:  nil,
+	}); err != nil {
+		s.logger.Error("Failed to log event", "event_type", eventType, "error", err, "user_id", userID)
+	}
 }
