@@ -10,28 +10,31 @@ import (
 // Maps to database.PublicFeedsInsert.
 // Used by: POST /feeds
 type CreateFeedCommand struct {
-	Name string `form:"name" json:"name" validate:"required,max=255"`
-	URL  string `form:"url" json:"url" validate:"required,httpurl"`
+	Name   string `form:"name" json:"name" validate:"required,max=255"`
+	URL    string `form:"url" json:"url" validate:"required,http_url"`
+	UserID string `param:"-"`
 }
 
 // UpdateFeedCommand represents the input for updating an existing feed.
 // Maps to database.PublicFeedsUpdate (subset of fields).
 // Used by: PATCH /feeds/{id}
 type UpdateFeedCommand struct {
-	Name string `form:"name" json:"name" validate:"required,max=255"`
-	URL  string `form:"url" json:"url" validate:"required,httpurl"`
+	ID     string `param:"id"`
+	UserID string `param:"-"`
+	Name   string `form:"name" json:"name" validate:"required,max=255"`
+	URL    string `form:"url" json:"url" validate:"required,http_url"`
 }
 
 // ToInsert converts CreateFeedCommand to database.PublicFeedsInsert.
-// UserID must be set separately by the handler from authenticated session.
+// UserID is automatically bound from authenticated session via custom binder.
 // Sets fetch_after to NOW() + 5 minutes to prevent race conditions with background job.
-func (c CreateFeedCommand) ToInsert(userID string) database.PublicFeedsInsert {
+func (c CreateFeedCommand) ToInsert() database.PublicFeedsInsert {
 	fetchAfter := time.Now().Add(5 * time.Minute).Format(time.RFC3339)
 
 	return database.PublicFeedsInsert{
 		Name:       c.Name,
 		Url:        c.URL,
-		UserId:     userID,
+		UserId:     c.UserID,
 		FetchAfter: &fetchAfter,
 		// CreatedAt, UpdatedAt, Id will be set by database
 		// LastFetchStatus, LastFetchError will be set by background job

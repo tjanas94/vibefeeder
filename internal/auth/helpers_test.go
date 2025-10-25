@@ -468,6 +468,559 @@ func TestIsUserExistsError_OtherErrors(t *testing.T) {
 	}
 }
 
+// Tests for isInvalidCredentialsError
+
+// TestIsInvalidCredentialsError_NilError tests that nil error returns false
+func TestIsInvalidCredentialsError_NilError(t *testing.T) {
+	result := isInvalidCredentialsError(nil)
+	assert.False(t, result)
+}
+
+// TestIsInvalidCredentialsError_InvalidGrantPattern tests detection of "invalid_grant" pattern
+func TestIsInvalidCredentialsError_InvalidGrantPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "invalid_grant",
+			expected: true,
+		},
+		{
+			name:     "in the middle of message",
+			errMsg:   "error: invalid_grant occurred",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - lowercase",
+			errMsg:   "invalid_grant",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - uppercase should not match",
+			errMsg:   "INVALID_GRANT",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidCredentialsError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidCredentialsError_InvalidLoginCredentialsPattern tests detection of "Invalid login credentials" pattern
+func TestIsInvalidCredentialsError_InvalidLoginCredentialsPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "Invalid login credentials",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "auth error: Invalid login credentials provided",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - lowercase should not match",
+			errMsg:   "invalid login credentials",
+			expected: false,
+		},
+		{
+			name:     "case sensitive - uppercase should not match",
+			errMsg:   "INVALID LOGIN CREDENTIALS",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidCredentialsError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidCredentialsError_InvalidCredentialsPattern tests detection of "invalid_credentials" pattern
+func TestIsInvalidCredentialsError_InvalidCredentialsPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "invalid_credentials",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "validation failed: invalid_credentials detected",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - uppercase should not match",
+			errMsg:   "INVALID_CREDENTIALS",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidCredentialsError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidCredentialsError_InvalidEmailOrPasswordPattern tests detection of "Invalid email or password" pattern
+func TestIsInvalidCredentialsError_InvalidEmailOrPasswordPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "Invalid email or password",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "login failed: Invalid email or password provided",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - lowercase should not match",
+			errMsg:   "invalid email or password",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidCredentialsError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidCredentialsError_EitherPatternMatches tests that function returns true if any pattern matches
+func TestIsInvalidCredentialsError_EitherPatternMatches(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "first pattern - invalid_grant",
+			errMsg:   "error: invalid_grant",
+			expected: true,
+		},
+		{
+			name:     "second pattern - Invalid login credentials",
+			errMsg:   "error: Invalid login credentials",
+			expected: true,
+		},
+		{
+			name:     "third pattern - invalid_credentials",
+			errMsg:   "error: invalid_credentials",
+			expected: true,
+		},
+		{
+			name:     "fourth pattern - Invalid email or password",
+			errMsg:   "error: Invalid email or password",
+			expected: true,
+		},
+		{
+			name:     "multiple patterns in same error",
+			errMsg:   "invalid_grant and Invalid login credentials",
+			expected: true,
+		},
+		{
+			name:     "no matching patterns",
+			errMsg:   "network timeout",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidCredentialsError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidCredentialsError_OtherErrors tests non-credentials errors return false
+func TestIsInvalidCredentialsError_OtherErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "user not found",
+			errMsg:   "user not found",
+			expected: false,
+		},
+		{
+			name:     "account locked",
+			errMsg:   "account is locked",
+			expected: false,
+		},
+		{
+			name:     "server error",
+			errMsg:   "internal server error",
+			expected: false,
+		},
+		{
+			name:     "database error",
+			errMsg:   "database connection failed",
+			expected: false,
+		},
+		{
+			name:     "empty string",
+			errMsg:   "",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidCredentialsError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// Tests for isInvalidTokenError
+
+// TestIsInvalidTokenError_NilError tests that nil error returns false
+func TestIsInvalidTokenError_NilError(t *testing.T) {
+	result := isInvalidTokenError(nil)
+	assert.False(t, result)
+}
+
+// TestIsInvalidTokenError_InvalidTokenPattern tests detection of "invalid_token" pattern
+func TestIsInvalidTokenError_InvalidTokenPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "invalid_token",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "Token verification failed: invalid_token in request",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - uppercase should not match",
+			errMsg:   "INVALID_TOKEN",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidTokenError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidTokenError_ExpiredTokenPattern tests detection of "expired_token" pattern
+func TestIsInvalidTokenError_ExpiredTokenPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "expired_token",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "Token validation failed: expired_token detected",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - uppercase should not match",
+			errMsg:   "EXPIRED_TOKEN",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidTokenError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidTokenError_TokenNotFoundPattern tests detection of "token_not_found" pattern
+func TestIsInvalidTokenError_TokenNotFoundPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "token_not_found",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "error: token_not_found in session",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - uppercase should not match",
+			errMsg:   "TOKEN_NOT_FOUND",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidTokenError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidTokenError_TokenNotFoundCapitalizedPattern tests detection of "Token not found" pattern
+func TestIsInvalidTokenError_TokenNotFoundCapitalizedPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "Token not found",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "error: Token not found in database",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - lowercase should not match",
+			errMsg:   "token not found",
+			expected: false,
+		},
+		{
+			name:     "case sensitive - uppercase should not match",
+			errMsg:   "TOKEN NOT FOUND",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidTokenError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidTokenError_InvalidTokenCapitalizedPattern tests detection of "Invalid token" pattern
+func TestIsInvalidTokenError_InvalidTokenCapitalizedPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "Invalid token",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "validation failed: Invalid token received",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - lowercase should not match",
+			errMsg:   "invalid token",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidTokenError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidTokenError_ExpiredTokenCapitalizedPattern tests detection of "Expired token" pattern
+func TestIsInvalidTokenError_ExpiredTokenCapitalizedPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			errMsg:   "Expired token",
+			expected: true,
+		},
+		{
+			name:     "in middle of message",
+			errMsg:   "token check: Expired token in request",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - lowercase should not match",
+			errMsg:   "expired token",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidTokenError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidTokenError_EitherPatternMatches tests that function returns true if any pattern matches
+func TestIsInvalidTokenError_EitherPatternMatches(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "first pattern - invalid_token",
+			errMsg:   "error: invalid_token",
+			expected: true,
+		},
+		{
+			name:     "second pattern - expired_token",
+			errMsg:   "error: expired_token",
+			expected: true,
+		},
+		{
+			name:     "third pattern - token_not_found",
+			errMsg:   "error: token_not_found",
+			expected: true,
+		},
+		{
+			name:     "fourth pattern - Token not found",
+			errMsg:   "error: Token not found",
+			expected: true,
+		},
+		{
+			name:     "fifth pattern - Invalid token",
+			errMsg:   "error: Invalid token",
+			expected: true,
+		},
+		{
+			name:     "sixth pattern - Expired token",
+			errMsg:   "error: Expired token",
+			expected: true,
+		},
+		{
+			name:     "multiple patterns in same error",
+			errMsg:   "invalid_token and Expired token detected",
+			expected: true,
+		},
+		{
+			name:     "no matching patterns",
+			errMsg:   "database connection failed",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidTokenError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestIsInvalidTokenError_OtherErrors tests non-token errors return false
+func TestIsInvalidTokenError_OtherErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "user not found",
+			errMsg:   "user not found",
+			expected: false,
+		},
+		{
+			name:     "network error",
+			errMsg:   "network connection timeout",
+			expected: false,
+		},
+		{
+			name:     "server error",
+			errMsg:   "internal server error",
+			expected: false,
+		},
+		{
+			name:     "database error",
+			errMsg:   "database connection failed",
+			expected: false,
+		},
+		{
+			name:     "empty string",
+			errMsg:   "",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			result := isInvalidTokenError(err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // Tests for isSamePasswordError
 
 // TestIsSamePasswordError_NilError tests that nil error returns false

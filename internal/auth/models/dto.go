@@ -25,11 +25,3 @@ type ResetPasswordRequest struct {
 	Password        string `form:"password" validate:"required,strongpassword=50"`
 	PasswordConfirm string `form:"password_confirm" validate:"required,eqfield=Password"`
 }
-
-// UserSession represents the authenticated user session data
-type UserSession struct {
-	UserID       string
-	Email        string
-	AccessToken  string
-	RefreshToken string
-}

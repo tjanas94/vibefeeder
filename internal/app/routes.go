@@ -29,7 +29,7 @@ func (a *App) setupRoutes() {
 
 	// Protected routes (authentication required)
 	protectedGroup := a.Echo.Group("")
-	protectedGroup.Use(auth.AuthMiddleware(c.AuthMiddlewareAdapter, c.SessionManager, c.Logger))
+	protectedGroup.Use(auth.AuthMiddleware(c.AuthService, c.SessionManager, c.Logger))
 	protectedGroup.Use(a.csrfMiddleware())
 
 	// Root redirect to dashboard

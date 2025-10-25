@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -12,15 +11,11 @@ import (
 )
 
 // Handler handles dashboard requests
-type Handler struct {
-	logger *slog.Logger
-}
+type Handler struct{}
 
 // NewHandler creates a new dashboard handler
-func NewHandler(logger *slog.Logger) *Handler {
-	return &Handler{
-		logger: logger,
-	}
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
 // ShowDashboard renders the main dashboard page
@@ -29,22 +24,12 @@ func (h *Handler) ShowDashboard(c echo.Context) error {
 	// Get authenticated user email from context
 	userEmail := auth.GetUserEmail(c)
 
-	// Bind and validate query params using the same struct as GET /feeds
+	// Bind and sanitize query parameters
 	query := new(feedmodels.ListFeedsQuery)
-	if err := c.Bind(query); err != nil {
-		h.logger.Warn("failed to bind query parameters", "error", err)
-		// Use defaults on binding error
-		query = &feedmodels.ListFeedsQuery{}
-	}
+	_ = c.Bind(query) // Ignore bind errors for query parameters
 
+	// Sanitize and set defaults for invalid/missing values
 	query.SetDefaults()
-
-	if err := c.Validate(query); err != nil {
-		h.logger.Warn("invalid query parameters", "error", err)
-		// Use defaults on validation error
-		query = &feedmodels.ListFeedsQuery{}
-		query.SetDefaults()
-	}
 
 	// Prepare view model
 	vm := models.DashboardViewModel{

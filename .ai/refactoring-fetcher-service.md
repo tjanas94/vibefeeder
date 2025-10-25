@@ -54,7 +54,8 @@ internal/fetcher/
 **Kluczowe Metody:**
 
 - `NewRateLimiter(domainDelay time.Duration) *RateLimiter`
-- `WaitIfNeeded(feedURL string)` - blokuje, jeśli zapytanie jest zbyt szybkie dla danej domeny
+- `WaitIfNeeded(ctx context.Context, feedURL string) error` - blokuje, jeśli zapytanie jest zbyt szybkie dla danej domeny, wspiera anulowanie kontekstu
+- `CleanOldEntries(cutoff time.Time)` - usuwa stare wpisy domeny, zapobiega wyciekom pamięci
 
 **Stan:**
 
@@ -73,7 +74,7 @@ internal/fetcher/
 **Kluczowe Metody:**
 
 - `NewWorkerPool(workerCount int, logger *slog.Logger) *WorkerPool`
-- `Process(ctx context.Context, items []interface{}, processFn func(interface{}))`
+- `ProcessFeeds(ctx context.Context, feeds []database.PublicFeedsSelect, processFn func(database.PublicFeedsSelect))` - przetwarzanie feedów z respektowaniem limitu workerów
 
 **Cechy:**
 
@@ -85,6 +86,7 @@ internal/fetcher/
 **Zależności:**
 
 - `log/slog` (logowanie)
+- `database.PublicFeedsSelect` (typ feeda)
 
 ---
 
@@ -187,23 +189,29 @@ type FeedData struct {
 
 ### 6. Scheduler (`scheduler.go`)
 
-**Odpowiedzialność:** Harmonogramowanie i orkiestracja przetwarzania wsadowego.
+**Odpowiedzialność:** Harmonogramowanie i orkiestracja przetwarzania wsadowego oraz natychmiastowego pobierania feedów.
 
 **Kluczowe Metody:**
 
 - `NewScheduler(repo, workerPool, rateLimiter, feedFetcher, statusManager, logger, config, appCtx) *Scheduler`
-- `Start()` - główna pętla z tickerem
-- `ProcessBatch()` - pobiera i przetwarza wsad feedów
-- `processSingleFeed(feed)` - przetwarza pojedynczy feed
-- `handleFetchError(feed, err)` - obsługa błędów HTTP/sieciowych
+- `Start()` - główna pętla z tickerem, uruchamiająca batch processing
+- `ProcessBatch()` - pobiera i przetwarza wsad feedów, czyszcza stare wpisy rate limitera
+- `FetchSingleFeedByID(feedID string)` - natychmiastowe pobieranie pojedynczego feeda, respektuje worker pool
+- `processSingleFeed(feed)` - wspólna logika przetwarzania dla batch i immediate fetch
 
 **Przepływ:**
 
-1.  Ticker co X minut
-2.  `FindFeedsDueForFetch()`
-3.  `WorkerPool.Process()` dla wszystkich feedów
-4.  Dla każdego feeda:
-    - `RateLimiter.WaitIfNeeded()`
+1.  **Batch Processing:**
+    - Ticker co X minut
+    - `CleanOldEntries()` na rate limitera
+    - `FindFeedsDueForFetch()`
+    - `WorkerPool.ProcessFeeds()` dla wszystkich feedów
+2.  **Immediate Fetch:**
+    - `FetchSingleFeedByID()` użytkownika
+    - `FindFeedByID()`
+    - `WorkerPool.ProcessFeeds()` dla jednego feeda
+3.  **Dla każdego feeda w processSingleFeed():**
+    - `RateLimiter.WaitIfNeeded()` z timeoutem
     - `FeedFetcher.Fetch()`
     - `FeedStatusManager.ApplyDecision()`
 
@@ -225,24 +233,24 @@ type FeedData struct {
 
 **Kluczowe Metody:**
 
-- `NewFeedFetcherService(dbClient, logger, cfg, appCtx) *FeedFetcherService` - konfiguracja wszystkich komponentów
-- `Start()` - deleguje do `Scheduler.Start()`
-- `FetchFeedNow(feedID string)` - bezpośrednie użycie `FeedFetcher` (asynchronicznie)
+- `NewFeedFetcherService(repo, httpClient, logger, cfg, appCtx) *FeedFetcherService` - konfiguracja wszystkich komponentów
+- `Start()` - deleguje do `Scheduler.Start()` dla uruchomienia batch processing
+- `FetchFeedNow(feedID string)` - asynchronicznie deleguje do `Scheduler.FetchSingleFeedByID()` dla natychmiastowego pobierania
 
 **Stan:**
 
 ```go
 type FeedFetcherService struct {
-    scheduler     *Scheduler
-    feedFetcher   *FeedFetcher
-    statusManager *FeedStatusManager
-    repo          *Repository
-    logger        *slog.Logger
-    appCtx        context.Context
+    scheduler *Scheduler
+    logger    *slog.Logger
+    appCtx    context.Context
 }
 ```
 
-**Zależności:** Wszystkie komponenty (tworzy je w konstruktorze)
+**Zależności:**
+
+- `Scheduler` (tworzy w konstruktorze z innymi komponentami)
+- Pośrednio wszystkie komponenty przez Scheduler
 
 ---
 
@@ -331,7 +339,7 @@ Każdy komponent powinien być niezależnie testowalny:
 - **HTTPResponseHandler**: Test wszystkich kodów statusu, weryfikacja poprawnych decyzji
 - **FeedFetcher**: Mock `HTTPClient`, test logiki parsowania
 - **FeedStatusManager**: Mock `Repository`, weryfikacja aktualizacji w bazie danych
-- **Scheduler**: Mock wszystkich zależności, test orkiestracji
+- **Calculations**: Czyste funkcje testowe dla kalkulacji (timingu, backoff, parsowania)
 
 ### Testy E2E
 

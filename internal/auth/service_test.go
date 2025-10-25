@@ -5,19 +5,19 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/supabase-community/gotrue-go"
 	"github.com/supabase-community/gotrue-go/types"
 	"github.com/tjanas94/vibefeeder/internal/auth/models"
+	sharedAuth "github.com/tjanas94/vibefeeder/internal/shared/auth"
 	"github.com/tjanas94/vibefeeder/internal/shared/config"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	sharederrors "github.com/tjanas94/vibefeeder/internal/shared/errors"
 )
 
-// MockAuth embeds a real gotrue.Client and overrides methods for testing
+// MockAuth implements GoTrueAdapter interface for testing
 type MockAuth struct {
 	mock.Mock
 }
@@ -59,9 +59,12 @@ func (m *MockAuth) Recover(req types.RecoverRequest) error {
 	return args.Error(0)
 }
 
-func (m *MockAuth) WithToken(token string) gotrue.Client {
+func (m *MockAuth) WithToken(token string) sharedAuth.GoTrueAdapter {
 	args := m.Called(token)
-	return args.Get(0).(gotrue.Client)
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).(sharedAuth.GoTrueAdapter)
 }
 
 func (m *MockAuth) GetUser() (*types.UserResponse, error) {
@@ -84,80 +87,6 @@ func (m *MockAuth) Logout() error {
 	args := m.Called()
 	return args.Error(0)
 }
-
-// Implement all remaining gotrue.Client methods
-func (m *MockAuth) WithCustomGoTrueURL(url string) gotrue.Client { return m }
-func (m *MockAuth) WithClient(client http.Client) gotrue.Client  { return m }
-func (m *MockAuth) AdminAudit(req types.AdminAuditRequest) (*types.AdminAuditResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminGenerateLink(req types.AdminGenerateLinkRequest) (*types.AdminGenerateLinkResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminListSSOProviders() (*types.AdminListSSOProvidersResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminCreateSSOProvider(req types.AdminCreateSSOProviderRequest) (*types.AdminCreateSSOProviderResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminGetSSOProvider(req types.AdminGetSSOProviderRequest) (*types.AdminGetSSOProviderResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminUpdateSSOProvider(req types.AdminUpdateSSOProviderRequest) (*types.AdminUpdateSSOProviderResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminDeleteSSOProvider(req types.AdminDeleteSSOProviderRequest) (*types.AdminDeleteSSOProviderResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminCreateUser(req types.AdminCreateUserRequest) (*types.AdminCreateUserResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminListUsers() (*types.AdminListUsersResponse, error) { return nil, nil }
-func (m *MockAuth) AdminGetUser(req types.AdminGetUserRequest) (*types.AdminGetUserResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminUpdateUser(req types.AdminUpdateUserRequest) (*types.AdminUpdateUserResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminDeleteUser(req types.AdminDeleteUserRequest) error { return nil }
-func (m *MockAuth) AdminListUserFactors(req types.AdminListUserFactorsRequest) (*types.AdminListUserFactorsResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminUpdateUserFactor(req types.AdminUpdateUserFactorRequest) (*types.AdminUpdateUserFactorResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) AdminDeleteUserFactor(req types.AdminDeleteUserFactorRequest) error { return nil }
-func (m *MockAuth) Authorize(req types.AuthorizeRequest) (*types.AuthorizeResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) EnrollFactor(req types.EnrollFactorRequest) (*types.EnrollFactorResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) ChallengeFactor(req types.ChallengeFactorRequest) (*types.ChallengeFactorResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) VerifyFactor(req types.VerifyFactorRequest) (*types.VerifyFactorResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) UnenrollFactor(req types.UnenrollFactorRequest) (*types.UnenrollFactorResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) HealthCheck() (*types.HealthCheckResponse, error)              { return nil, nil }
-func (m *MockAuth) Invite(req types.InviteRequest) (*types.InviteResponse, error) { return nil, nil }
-func (m *MockAuth) Magiclink(req types.MagiclinkRequest) error                    { return nil }
-func (m *MockAuth) OTP(req types.OTPRequest) error                                { return nil }
-func (m *MockAuth) Reauthenticate() error                                         { return nil }
-func (m *MockAuth) GetSettings() (*types.SettingsResponse, error)                 { return nil, nil }
-func (m *MockAuth) SignInWithPhonePassword(phone, password string) (*types.TokenResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) Token(req types.TokenRequest) (*types.TokenResponse, error) { return nil, nil }
-func (m *MockAuth) VerifyForUser(req types.VerifyForUserRequest) (*types.VerifyForUserResponse, error) {
-	return nil, nil
-}
-func (m *MockAuth) SAMLACS(req *http.Request) (*http.Response, error)    { return nil, nil }
-func (m *MockAuth) SAMLMetadata() ([]byte, error)                        { return nil, nil }
-func (m *MockAuth) SSO(req types.SSORequest) (*types.SSOResponse, error) { return nil, nil }
 
 type MockEventRepo struct {
 	mock.Mock
@@ -228,7 +157,10 @@ func TestRegister_InvalidCode(t *testing.T) {
 		RegistrationCode: "wrong-code",
 	})
 
-	assert.Equal(t, ErrInvalidRegistrationCode, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 422, serviceErr.Code)
 	mockAuth.AssertNotCalled(t, "Signup")
 }
 
@@ -249,7 +181,10 @@ func TestRegister_UserExists(t *testing.T) {
 		RegistrationCode: "test-code-123",
 	})
 
-	assert.Equal(t, ErrUserAlreadyExists, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 409, serviceErr.Code)
 }
 
 // TestLogin_Success tests successful login
@@ -303,7 +238,10 @@ func TestLogin_InvalidCredentials(t *testing.T) {
 		Password: "wrong",
 	})
 
-	assert.Equal(t, ErrInvalidCredentials, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 401, serviceErr.Code)
 	assert.Nil(t, session)
 }
 
@@ -347,7 +285,10 @@ func TestRefreshSession_Expired(t *testing.T) {
 	svc := NewService(mockAuth, mockEvents, cfg, newTestLogger())
 	session, err := svc.RefreshSession(ctx, "expired-token")
 
-	assert.Equal(t, ErrSessionExpired, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 401, serviceErr.Code)
 	assert.Nil(t, session)
 }
 
@@ -393,7 +334,10 @@ func TestGetUserByToken_Invalid(t *testing.T) {
 	svc := NewService(mockAuth, mockEvents, cfg, newTestLogger())
 	session, err := svc.GetUserByToken(ctx, "invalid-token")
 
-	assert.Equal(t, ErrSessionExpired, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 401, serviceErr.Code)
 	assert.Nil(t, session)
 }
 
@@ -483,7 +427,10 @@ func TestVerifyEmailConfirmation_InvalidToken(t *testing.T) {
 	svc := NewService(mockAuth, mockEvents, cfg, newTestLogger())
 	err := svc.VerifyEmailConfirmation(ctx, "invalid-token")
 
-	assert.Equal(t, ErrInvalidToken, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 400, serviceErr.Code)
 }
 
 // TestResetPassword_Success tests successful password reset
@@ -561,5 +508,8 @@ func TestResetPassword_SamePassword(t *testing.T) {
 	svc := NewService(mockAuth, mockEvents, cfg, newTestLogger())
 	err := svc.ResetPassword(ctx, testToken, testPassword)
 
-	assert.Equal(t, ErrSamePassword, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 422, serviceErr.Code)
 }

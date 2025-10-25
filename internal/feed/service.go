@@ -2,7 +2,6 @@ package feed
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -12,23 +11,12 @@ import (
 	sharedmodels "github.com/tjanas94/vibefeeder/internal/shared/models"
 )
 
-var (
-	// ErrFeedAlreadyExists indicates that a feed with the same URL already exists for the user
-	ErrFeedAlreadyExists = errors.New("feed already exists for this user")
-
-	// ErrFeedNotFound indicates that the feed was not found or doesn't belong to the user
-	ErrFeedNotFound = errors.New("feed not found")
-
-	// ErrFeedURLConflict indicates that the new URL is already in use by another feed
-	ErrFeedURLConflict = errors.New("feed URL already in use")
-)
-
 // FeedRepository defines the interface for feed data access
 type FeedRepository interface {
 	ListFeeds(ctx context.Context, query models.ListFeedsQuery) (*ListFeedsResult, error)
 	InsertFeed(ctx context.Context, feed database.PublicFeedsInsert) (string, error)
 	FindFeedByIDAndUser(ctx context.Context, feedID, userID string) (*database.PublicFeedsSelect, error)
-	IsURLTaken(ctx context.Context, userID, url, excludeFeedID string) (bool, error)
+	IsURLTaken(ctx context.Context, query models.CheckURLTakenQuery) (bool, error)
 	UpdateFeed(ctx context.Context, feedID string, update database.PublicFeedsUpdate) error
 	DeleteFeed(ctx context.Context, id, userID string) error
 }
@@ -54,7 +42,8 @@ func (s *Service) ListFeeds(ctx context.Context, query models.ListFeedsQuery) (*
 	// Fetch feeds from repository
 	result, err := s.repo.ListFeeds(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list feeds: %w", err)
+		s.logger.Error("failed to list feeds", "user_id", query.UserID, "error", err)
+		return nil, NewDatabaseError(err)
 	}
 
 	// Build view model using pure function
@@ -63,30 +52,30 @@ func (s *Service) ListFeeds(ctx context.Context, query models.ListFeedsQuery) (*
 }
 
 // CreateFeed creates a new feed for the authenticated user and returns the feed ID
-func (s *Service) CreateFeed(ctx context.Context, cmd models.CreateFeedCommand, userID string) (string, error) {
-	// Convert command to insert model
-	feedInsert := cmd.ToInsert(userID)
+func (s *Service) CreateFeed(ctx context.Context, cmd models.CreateFeedCommand) (string, error) {
+	// Convert command to insert model (UserID is already set via custom binder)
+	feedInsert := cmd.ToInsert()
 
 	// Insert feed into database
 	feedID, err := s.repo.InsertFeed(ctx, feedInsert)
 	if err != nil {
 		// Check if error is due to unique constraint violation (duplicate URL for user)
 		if database.IsUniqueViolationError(err) {
-			return "", ErrFeedAlreadyExists
+			return "", NewFeedAlreadyExistsError()
 		}
-		return "", fmt.Errorf("failed to create feed: %w", err)
+		return "", fmt.Errorf("failed to create feed %w", err)
 	}
 
 	// Log feed_added event
 	if err := s.eventRepo.RecordEvent(ctx, database.PublicEventsInsert{
 		EventType: events.EventFeedAdded,
-		UserId:    &userID,
+		UserId:    &cmd.UserID,
 		Metadata: map[string]any{
 			"feed_name": cmd.Name,
 			"feed_url":  cmd.URL,
 		},
 	}); err != nil {
-		s.logger.Warn("Failed to log event", "event_type", events.EventFeedAdded, "error", err, "user_id", userID)
+		s.logger.Warn("Failed to log event", "event_type", events.EventFeedAdded, "error", err, "user_id", cmd.UserID)
 	}
 
 	return feedID, nil
@@ -99,9 +88,9 @@ func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*m
 	if err != nil {
 		// Check if error indicates feed not found
 		if database.IsNotFoundError(err) {
-			return nil, ErrFeedNotFound
+			return nil, NewFeedNotFoundError()
 		}
-		return nil, fmt.Errorf("failed to get feed for edit: %w", err)
+		return nil, fmt.Errorf("failed to get feed for edit %w", err)
 	}
 
 	// Map database model to view model
@@ -111,14 +100,14 @@ func (s *Service) GetFeedForEdit(ctx context.Context, feedID, userID string) (*m
 
 // UpdateFeed updates an existing feed with validation and conflict detection
 // Returns true if URL was changed, false otherwise
-func (s *Service) UpdateFeed(ctx context.Context, feedID, userID string, cmd models.UpdateFeedCommand) (bool, error) {
-	// Get existing feed to verify ownership
-	existingFeed, err := s.repo.FindFeedByIDAndUser(ctx, feedID, userID)
+func (s *Service) UpdateFeed(ctx context.Context, cmd models.UpdateFeedCommand) (bool, error) {
+	// Get existing feed to verify ownership (UserID and ID are already set via custom binder)
+	existingFeed, err := s.repo.FindFeedByIDAndUser(ctx, cmd.ID, cmd.UserID)
 	if err != nil {
 		if database.IsNotFoundError(err) {
-			return false, ErrFeedNotFound
+			return false, NewFeedNotFoundError()
 		}
-		return false, fmt.Errorf("failed to get feed for update: %w", err)
+		return false, fmt.Errorf("failed to get feed for update %w", err)
 	}
 
 	// Prepare update data based on whether URL changed
@@ -130,32 +119,19 @@ func (s *Service) UpdateFeed(ctx context.Context, feedID, userID string, cmd mod
 		updateData = cmd.ToUpdate()
 	} else {
 		// URL changed - validate and reset fetch-related fields
-		if err := s.validateURLChange(ctx, userID, feedID, cmd.URL); err != nil {
-			return false, err
+		urlErr := s.validateURLChange(ctx, cmd.UserID, cmd.ID, cmd.URL)
+		if urlErr != nil {
+			return false, urlErr
 		}
 		updateData = cmd.ToUpdateWithURLChange()
 	}
 
 	// Perform update
-	if err := s.repo.UpdateFeed(ctx, feedID, updateData); err != nil {
-		return false, fmt.Errorf("failed to update feed: %w", err)
+	if err := s.repo.UpdateFeed(ctx, cmd.ID, updateData); err != nil {
+		return false, fmt.Errorf("failed to update feed %w", err)
 	}
 
 	return urlChanged, nil
-}
-
-// validateURLChange checks if new URL can be used
-func (s *Service) validateURLChange(ctx context.Context, userID, feedID, newURL string) error {
-	isTaken, err := s.repo.IsURLTaken(ctx, userID, newURL, feedID)
-	if err != nil {
-		return fmt.Errorf("failed to check URL availability: %w", err)
-	}
-
-	if isTaken {
-		return ErrFeedURLConflict
-	}
-
-	return nil
 }
 
 // DeleteFeed deletes a feed for the authenticated user
@@ -164,10 +140,29 @@ func (s *Service) DeleteFeed(ctx context.Context, id, userID string) error {
 	if err := s.repo.DeleteFeed(ctx, id, userID); err != nil {
 		// Check if error indicates feed not found
 		if database.IsNotFoundError(err) {
-			return ErrFeedNotFound
+			return NewFeedNotFoundError()
 		}
-		// Return generic error for other cases
-		return fmt.Errorf("failed to delete feed: %w", err)
+		return fmt.Errorf("failed to delete feed %w", err)
+	}
+
+	return nil
+}
+
+// validateURLChange checks if new URL can be used
+func (s *Service) validateURLChange(ctx context.Context, userID, feedID, newURL string) error {
+	query := models.CheckURLTakenQuery{
+		UserID:        userID,
+		URL:           newURL,
+		ExcludeFeedID: feedID,
+	}
+
+	isTaken, err := s.repo.IsURLTaken(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to check URL availability %w", err)
+	}
+
+	if isTaken {
+		return NewFeedAlreadyExistsError()
 	}
 
 	return nil

@@ -377,32 +377,6 @@ func TestFeedListViewModel(t *testing.T) {
 	})
 }
 
-// TestDeleteConfirmationViewModel tests the DeleteConfirmationViewModel structure
-func TestDeleteConfirmationViewModel(t *testing.T) {
-	t.Run("delete confirmation without error", func(t *testing.T) {
-		vm := DeleteConfirmationViewModel{
-			FeedID:   "feed-123",
-			FeedName: "Tech Blog",
-		}
-
-		assert.Equal(t, "feed-123", vm.FeedID)
-		assert.Equal(t, "Tech Blog", vm.FeedName)
-		assert.Empty(t, vm.ErrorMessage)
-	})
-
-	t.Run("delete confirmation with error", func(t *testing.T) {
-		vm := DeleteConfirmationViewModel{
-			FeedID:       "feed-456",
-			FeedName:     "News Site",
-			ErrorMessage: "Feed not found",
-		}
-
-		assert.Equal(t, "feed-456", vm.FeedID)
-		assert.Equal(t, "News Site", vm.FeedName)
-		assert.Equal(t, "Feed not found", vm.ErrorMessage)
-	})
-}
-
 // BenchmarkNewFeedItemFromDB benchmarks feed item creation
 func BenchmarkNewFeedItemFromDB(b *testing.B) {
 	status := "success"

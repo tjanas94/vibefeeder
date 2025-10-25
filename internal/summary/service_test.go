@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tjanas94/vibefeeder/internal/shared/ai"
 	"github.com/tjanas94/vibefeeder/internal/shared/database"
+	sharederrors "github.com/tjanas94/vibefeeder/internal/shared/errors"
 	"github.com/tjanas94/vibefeeder/internal/shared/events"
 	"github.com/tjanas94/vibefeeder/internal/summary/models"
 )
@@ -176,7 +177,10 @@ func TestGenerateSummary_NoArticles(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Equal(t, ErrNoArticlesFound, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 404, serviceErr.Code)
 	mockAI.AssertNotCalled(t, "GenerateChatCompletion")
 	mockRepo.AssertNotCalled(t, "SaveSummary")
 }
@@ -198,7 +202,10 @@ func TestGenerateSummary_FetchArticlesError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "failed to fetch articles")
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 500, serviceErr.Code)
 	mockAI.AssertNotCalled(t, "GenerateChatCompletion")
 }
 
@@ -226,7 +233,10 @@ func TestGenerateSummary_AIServiceError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Equal(t, ErrAIServiceUnavailable, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 503, serviceErr.Code)
 	mockRepo.AssertNotCalled(t, "SaveSummary")
 }
 
@@ -261,7 +271,10 @@ func TestGenerateSummary_AIResponseEmpty(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Equal(t, ErrAIServiceUnavailable, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 503, serviceErr.Code)
 }
 
 func TestGenerateSummary_SaveSummaryError(t *testing.T) {
@@ -293,7 +306,10 @@ func TestGenerateSummary_SaveSummaryError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Equal(t, ErrDatabase, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 500, serviceErr.Code)
 }
 
 func TestGenerateSummary_EventLogError(t *testing.T) {
@@ -505,7 +521,10 @@ func TestGetLatestSummaryForUser_HasFeedsError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "failed to check user feeds")
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 500, serviceErr.Code)
 }
 
 // Tests for buildSummaryDisplayViewModel (pure function)
@@ -568,7 +587,10 @@ func TestGenerateSummary_ContextTimeout(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Equal(t, ErrAIServiceUnavailable, err)
+	// Check if error is a ServiceError with the correct HTTP code
+	serviceErr, ok := sharederrors.AsServiceError(err)
+	assert.True(t, ok, "error should be a ServiceError")
+	assert.Equal(t, 503, serviceErr.Code)
 }
 
 // Tests for Articles with nil content

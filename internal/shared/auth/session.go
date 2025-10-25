@@ -4,22 +4,21 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/tjanas94/vibefeeder/internal/auth/models"
 	"github.com/tjanas94/vibefeeder/internal/shared/config"
 )
 
-// SessionManager handles session cookie operations
-type SessionManager struct {
+// sessionManager handles session cookie operations
+type sessionManager struct {
 	config *config.AuthConfig
 }
 
 // NewSessionManager creates a new session manager
-func NewSessionManager(cfg *config.AuthConfig) *SessionManager {
-	return &SessionManager{config: cfg}
+func NewSessionManager(cfg *config.AuthConfig) SessionManager {
+	return &sessionManager{config: cfg}
 }
 
 // SetSessionCookies sets both access and refresh token cookies
-func (sm *SessionManager) SetSessionCookies(c echo.Context, session *models.UserSession) {
+func (sm *sessionManager) SetSessionCookies(c echo.Context, session *UserSession) {
 	// Set access token cookie
 	c.SetCookie(&http.Cookie{
 		Name:     sm.config.SessionCookieName,
@@ -44,7 +43,7 @@ func (sm *SessionManager) SetSessionCookies(c echo.Context, session *models.User
 }
 
 // ClearSessionCookies removes session cookies
-func (sm *SessionManager) ClearSessionCookies(c echo.Context) {
+func (sm *sessionManager) ClearSessionCookies(c echo.Context) {
 	// Delete access token cookie
 	c.SetCookie(&http.Cookie{
 		Name:     sm.config.SessionCookieName,
@@ -69,7 +68,7 @@ func (sm *SessionManager) ClearSessionCookies(c echo.Context) {
 }
 
 // GetAccessToken retrieves the access token from cookie
-func (sm *SessionManager) GetAccessToken(c echo.Context) (string, error) {
+func (sm *sessionManager) GetAccessToken(c echo.Context) (string, error) {
 	cookie, err := c.Cookie(sm.config.SessionCookieName)
 	if err != nil {
 		return "", err
@@ -78,7 +77,7 @@ func (sm *SessionManager) GetAccessToken(c echo.Context) (string, error) {
 }
 
 // GetRefreshToken retrieves the refresh token from cookie
-func (sm *SessionManager) GetRefreshToken(c echo.Context) (string, error) {
+func (sm *sessionManager) GetRefreshToken(c echo.Context) (string, error) {
 	cookie, err := c.Cookie(sm.config.RefreshCookieName)
 	if err != nil {
 		return "", err
@@ -87,7 +86,7 @@ func (sm *SessionManager) GetRefreshToken(c echo.Context) (string, error) {
 }
 
 // UpdateAccessToken updates only the access token cookie (used after refresh)
-func (sm *SessionManager) UpdateAccessToken(c echo.Context, accessToken string) {
+func (sm *sessionManager) UpdateAccessToken(c echo.Context, accessToken string) {
 	c.SetCookie(&http.Cookie{
 		Name:     sm.config.SessionCookieName,
 		Value:    accessToken,

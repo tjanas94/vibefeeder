@@ -237,6 +237,56 @@ func TestIsNotFoundError_UserNotFound(t *testing.T) {
 	assert.True(t, result)
 }
 
+// TestIsNotFoundError_SingleJsonObject tests detection of "single json object" message (PostgREST format)
+func TestIsNotFoundError_SingleJsonObject(t *testing.T) {
+	err := errors.New("single json object")
+	result := IsNotFoundError(err)
+	assert.True(t, result)
+}
+
+// TestIsNotFoundError_SingleJsonObjectCaseInsensitive tests case-insensitive matching for "single json object"
+func TestIsNotFoundError_SingleJsonObjectCaseInsensitive(t *testing.T) {
+	tests := []string{
+		"SINGLE JSON OBJECT",
+		"Single Json Object",
+		"SiNgLe JsOn ObJeCt",
+		"single json object",
+	}
+
+	for _, errMsg := range tests {
+		result := IsNotFoundError(errors.New(errMsg))
+		assert.True(t, result, "failed for message: %s", errMsg)
+	}
+}
+
+// TestIsNotFoundError_PostgRESTSingleJsonObjectFormat tests typical PostgREST error format
+func TestIsNotFoundError_PostgRESTSingleJsonObjectFormat(t *testing.T) {
+	tests := []string{
+		"HTTP 404: single json object",
+		"PostgREST Error: single json object expected but got zero rows",
+		"single json object - no rows returned",
+	}
+
+	for _, errMsg := range tests {
+		result := IsNotFoundError(errors.New(errMsg))
+		assert.True(t, result, "failed for message: %s", errMsg)
+	}
+}
+
+// TestIsNotFoundError_SingleJsonObjectWithContext tests "single json object" in contextual error message
+func TestIsNotFoundError_SingleJsonObjectWithContext(t *testing.T) {
+	tests := []string{
+		"failed to fetch resource: single json object",
+		"query result: single json object but received empty set",
+		"expected single json object, got zero rows from PostgREST",
+	}
+
+	for _, errMsg := range tests {
+		result := IsNotFoundError(errors.New(errMsg))
+		assert.True(t, result, "failed for message: %s", errMsg)
+	}
+}
+
 // Combined tests for both functions
 
 // TestErrorDetection_UniqueViolationDoesNotMatchNotFound tests that unique violation is not detected as not found

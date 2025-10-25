@@ -1,20 +1,36 @@
 package models
 
+// CheckURLTakenQuery represents the input parameters for checking if a URL is already in use.
+// Used by: Feed creation and update validation
+type CheckURLTakenQuery struct {
+	UserID        string // Required: User ID from authenticated session
+	URL           string // Required: URL to check for duplicates
+	ExcludeFeedID string // Optional: Feed ID to exclude from check (used during updates)
+}
+
 // ListFeedsQuery represents the input parameters for listing feeds.
 // Used by: GET /feeds
 type ListFeedsQuery struct {
-	UserID string `query:"-"`                                                           // Required: User ID from authenticated session (set by handler)
-	Search string `query:"search"`                                                      // Optional: Search phrase for feed names (case-insensitive)
-	Status string `query:"status" validate:"omitempty,oneof=all working error pending"` // Optional: Filter by last fetch status
-	Page   int    `query:"page" validate:"omitempty,gte=1"`                             // Optional: Page number (1-indexed), default: 1
+	UserID string `query:"-"`      // Required: User ID from authenticated session (set by handler)
+	Search string `query:"search"` // Optional: Search phrase for feed names (case-insensitive)
+	Status string `query:"status"` // Optional: Filter by last fetch status (all, working, error, pending)
+	Page   int    `query:"page"`   // Optional: Page number (1-indexed), default: 1
 }
 
 // SetDefaults sets default values for optional query parameters
+// and sanitizes invalid values
 func (q *ListFeedsQuery) SetDefaults() {
-	if q.Status == "" {
+	// Sanitize status - only allow valid values
+	switch q.Status {
+	case "all", "working", "error", "pending":
+		// Valid - keep it
+	default:
+		// Invalid or empty - default to "all"
 		q.Status = "all"
 	}
-	if q.Page == 0 {
+
+	// Sanitize page - must be >= 1
+	if q.Page < 1 {
 		q.Page = 1
 	}
 }

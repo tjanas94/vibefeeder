@@ -19,7 +19,7 @@ func NewTemplRenderer() *TemplRenderer {
 // Render implements echo.Renderer interface
 // The name parameter should be ignored as Templ uses type-safe components
 // The data parameter must be a templ.Component
-func (t *TemplRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+func (t *TemplRenderer) Render(w io.Writer, name string, data any, c echo.Context) error {
 	component, ok := data.(templ.Component)
 	if !ok {
 		return echo.NewHTTPError(echo.ErrInternalServerError.Code, "data must be a templ.Component")

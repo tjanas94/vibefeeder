@@ -45,6 +45,7 @@ func (h *Handler) CreateUser(c echo.Context) error {
 - `required` - Field must be present and non-empty
 - `email` - Must be a valid email address
 - `url` - Must be a valid URL
+- `http_url` - Must be a valid HTTP or HTTPS URL (stricter than `url`)
 - `min=N` - Minimum string length
 - `max=N` - Maximum string length
 - `len=N` - Exact string length
@@ -53,7 +54,6 @@ func (h *Handler) CreateUser(c echo.Context) error {
 
 ### Custom Validators
 
-- `httpurl` - Must be a valid HTTP or HTTPS URL (stricter than `url`)
 - `strongpassword[=entropy]` - Password strength validation using entropy (default 50 bits)
   - Example: `validate:"required,strongpassword=50"` - Requires minimum 50 bits of entropy
   - Example: `validate:"required,strongpassword"` - Uses default 50 bits
@@ -73,7 +73,7 @@ func (h *Handler) CreateUser(c echo.Context) error {
 
 ```go
 type FeedRequest struct {
-    URL         string `json:"url" validate:"required,httpurl"`
+    URL         string `json:"url" validate:"required,http_url"`
     Title       string `json:"title" validate:"required,min=3,max=100"`
     Category    string `json:"category" validate:"oneof=tech news sports"`
     RefreshRate int    `json:"refresh_rate" validate:"gte=5,lte=1440"` // minutes
@@ -86,12 +86,12 @@ type FeedRequest struct {
 type RegisterRequest struct {
     Email    string `json:"email" validate:"required,email"`
     Password string `json:"password" validate:"required,strongpassword=50"`
-    Website  string `json:"website" validate:"httpurl"` // Optional but must be HTTP/HTTPS if provided
+    Website  string `json:"website" validate:"http_url"` // Optional but must be HTTP/HTTPS if provided
 }
 
 type UpdateProfileRequest struct {
     NewPassword string `json:"new_password" validate:"strongpassword"` // Uses default 50 bits entropy
-    AvatarURL   string `json:"avatar_url" validate:"required,httpurl"`
+    AvatarURL   string `json:"avatar_url" validate:"required,http_url"`
 }
 ```
 
@@ -108,36 +108,7 @@ The validator automatically formats error messages into a map:
 
 Custom validator error messages:
 
-- `httpurl`: "Must be a valid HTTP or HTTPS URL"
 - `strongpassword`: "Make password longer or add numbers and symbols"
-
-## Helper Functions
-
-### IsValidUUID()
-
-Use this helper for validating path or query parameters that should be UUIDs:
-
-```go
-package myfeature
-
-import (
-    "net/http"
-    "github.com/labstack/echo/v4"
-    "github.com/tjanas94/vibefeeder/internal/shared/validator"
-)
-
-func (h *Handler) GetFeed(c echo.Context) error {
-    feedID := c.Param("id")
-
-    // Validate UUID format before database query
-    if !validator.IsValidUUID(feedID) {
-        return echo.NewHTTPError(http.StatusBadRequest, "Invalid feed ID format")
-    }
-
-    // Proceed with database query...
-    return nil
-}
-```
 
 ## Adding Custom Validations
 
